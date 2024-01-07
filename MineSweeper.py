@@ -46,6 +46,10 @@ levels = {
 }
 
 
+def blit_center(surface, surf, center, *args, **kwargs):
+    surface.blit(surf, (center[0] - surf.get_width()/2, center[1] - surf.get_height()/2), *args, **kwargs)
+
+
 class DifficultyChooser():
     current_diff = 'medium'
     def  __init__(self):
@@ -56,6 +60,7 @@ class DifficultyChooser():
             'hard': menu_font.render('hard', True, c),
             'extreme': menu_font.render('extreme', True, c)
             }
+        self.image = pygame.Surface(WIN_SIZE, pygame.SRCALPHA)
         self.rect = self.images['extreme'].get_rect()
         self.rect.inflate_ip(32, -2)
         self.rect.centery = 17
@@ -63,9 +68,27 @@ class DifficultyChooser():
         self.expanded = False
         self.triangle_points = [(self.rect.right-10, self.rect.top+11), (self.rect.right-18, self.rect.top+11), (self.rect.right-14, self.rect.top+17)]
         self.diff_nb = {'easy': 1, 'medium': 2, 'hard': 3, 'extreme': 4}
+        self.opt_size = self.images['extreme'].get_rect().height
+        self.options_name = ['easy', 'medium', 'hard', 'extreme']
+        self.options = {}
+        self.set_difficulty(self.current_diff)
+        self.hovered_color = list(pygame.colordict.THECOLORS['navyblue'])
+        self.hovered_color[3] = 200
     
-    def current_diff_nb(self):
-        return self.diff_nb[self.current_diff]
+    def set_difficulty(self, diff):
+        global Map, rows, cols, current_mines
+        self.current_diff = diff
+        self.options = {}
+        index = 0
+        for opt in self.options_name:
+            if opt != diff:
+                self.options[index] = {
+                    'name': opt,
+                    'rect': pygame.Rect(self.rect.left, self.rect.bottom + self.opt_size*index, self.rect.width, self.opt_size),
+                    'index': index
+                    }
+                index += 1
+        Map, rows, cols, current_mines = set_level(self.diff_nb[diff])
     
     def update(self):
         if self.rect.collidepoint(mouse_pos):
@@ -74,13 +97,36 @@ class DifficultyChooser():
                 self.expanded = not self.expanded
         else:
             self.hovered = False
+        if self.expanded:
+            if left_click and not self.hovered:
+                self.expanded = False
+            if left_click:
+                for opt in self.options.values():
+                    if opt['rect'].collidepoint(mouse_pos):
+                        self.set_difficulty(opt['name'])
+    
+    def is_hovered_exp(self):
+        hovered = self.hovered
+        if not hovered:
+            for opt in self.options.values():
+                if opt['rect'].collidepoint(mouse_pos):
+                    hovered = True
+        return hovered
     
     def render(self):
+        self.image.fill((0, 0, 0, 0))
         if self.hovered:
-            pygame.draw.rect(win, 'ivory4', self.rect)
-        win.blit(self.images[self.current_diff], (self.rect.x + 5, self.rect.top - 3))
-        pygame.draw.rect(win, COLOR2, self.rect, 2)
-        pygame.draw.polygon(win, COLOR2, self.triangle_points)
+            pygame.draw.rect(self.image, self.hovered_color, self.rect)
+        self.image.blit(self.images[self.current_diff], (self.rect.x + 5, self.rect.top - 3))
+        pygame.draw.rect(self.image, COLOR2, self.rect, 2)
+        pygame.draw.polygon(self.image, COLOR2, self.triangle_points)
+        if self.expanded:
+            for opt in self.options.values():
+                if opt['rect'].collidepoint(mouse_pos):
+                    pygame.draw.rect(self.image, self.hovered_color, opt['rect'])
+                self.image.blit(self.images[opt['name']], (self.rect.x + 5, self.rect.bottom + self.opt_size*opt['index'] - 2))
+            pygame.draw.rect(self.image, COLOR2, (self.rect.left, self.rect.bottom-2, self.rect.width, self.opt_size*3+4), 2)
+        win.blit(self.image, (0, 0))
 
 
 class Tile():
@@ -122,11 +168,7 @@ class Tile():
         return neighbours
 
 
-def blit_center(surface, surf, center, *args, **kwargs):
-    surface.blit(surf, (center[0] - surf.get_width()/2, center[1] - surf.get_height()/2), *args, **kwargs)
-
-
-def create_map(difficulty):
+def set_level(difficulty):
     global WIN_SIZE, TILE_SIZE, win
      # load variables
     rows = cols = levels['map'][difficulty]
@@ -161,7 +203,6 @@ def create_map(difficulty):
 
 try:
     dc = DifficultyChooser()
-    Map, rows, cols, current_mines = create_map(dc.current_diff_nb())
     
     while True:
         clock.tick(30)
@@ -187,9 +228,6 @@ try:
         
         pygame.draw.rect(win, 'black', (0, 0, WIN_SIZE[1], 35))
         
-        dc.update()
-        dc.render()
-        
         for y, row in enumerate(Map):
             for x, tile in enumerate(row):
                 # if tile.is_hovered():
@@ -205,6 +243,9 @@ try:
                     blit_center(win, menu_font.render(str(tile.type), True, 'black'), tile.rect.center)
         
         blit_center(win, menu_font.render(str(current_mines), True, COLOR2), (WIN_SIZE[0]-200, 17))
+        
+        dc.update()
+        dc.render()
         
         # for x in range(1, cols):
         #     pygame.draw.line(win, COLOR, (x*TILE_SIZE, 37), (x*TILE_SIZE, WIN_SIZE[1]))
