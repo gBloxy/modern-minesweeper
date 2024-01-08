@@ -1,6 +1,7 @@
 
 from sys import exit
 from random import randint
+from time import time, ctime
 import pygame
 pygame.init()
 
@@ -15,6 +16,9 @@ LIGHT_COLOR = (255, 252, 240)
 
 BKG1 = (25, 27, 45)
 BKG2 = (23, 25, 40)
+
+BKGR1 = (53, 55, 75)
+BKGR2 = (57, 59, 80)
 
 
 win = pygame.display.set_mode(WIN_SIZE)
@@ -74,9 +78,10 @@ class DifficultyChooser():
         self.set_difficulty(self.current_diff)
         self.hovered_color = list(pygame.colordict.THECOLORS['navyblue'])
         self.hovered_color[3] = 200
+        self.hovered = False
     
     def set_difficulty(self, diff):
-        global Map, rows, cols, current_mines
+        global Map, rows, cols, current_mines, first_click, game_over
         self.current_diff = diff
         self.options = {}
         index = 0
@@ -88,7 +93,7 @@ class DifficultyChooser():
                     'index': index
                     }
                 index += 1
-        Map, rows, cols, current_mines = set_level(self.diff_nb[diff])
+        Map, rows, cols, current_mines, first_click, game_over = set_level(self.diff_nb[diff])
     
     def update(self):
         if self.rect.collidepoint(mouse_pos):
@@ -107,7 +112,7 @@ class DifficultyChooser():
     
     def is_hovered_exp(self):
         hovered = self.hovered
-        if not hovered:
+        if not hovered and self.expanded:
             for opt in self.options.values():
                 if opt['rect'].collidepoint(mouse_pos):
                     hovered = True
@@ -134,10 +139,30 @@ class Tile():
         self.x = x
         self.y = y
         self.rect = pygame.Rect(x * TILE_SIZE, 35 + y * TILE_SIZE, TILE_SIZE, TILE_SIZE)
-        self.get_color()
-        self.hovered_color = COLOR
         self.type = None
         self.revealed = False
+        self._flaged = False
+        self.get_color()
+        self.hovered_color = COLOR
+    
+    @property
+    def flaged(self):
+        return self._flaged
+    
+    @flaged.setter
+    def flaged(self, value: bool):
+        global current_mines
+        if value and not self._flaged:
+            current_mines -= 1
+        elif not value and self._flaged:
+            current_mines += 1
+        self._flaged = value
+    
+    def reveal(self):
+        self.revealed = True
+        if self.flaged:
+            self.flaged = False
+        self.get_color()
     
     def set_type(self, type):
         self.type = type
@@ -145,14 +170,14 @@ class Tile():
     def get_color(self):
         if self.x % 2 == 0:
             if self.y % 2 == 0:
-                self.color = BKG1
+                self.color = BKG1 if not self.revealed else BKGR1
             else:
-                self.color = BKG2
+                self.color = BKG2 if not self.revealed else BKGR2
         else:
             if self.y % 2 == 0:
-                self.color = BKG2
+                self.color = BKG2 if not self.revealed else BKGR2
             else:
-                self.color = BKG1
+                self.color = BKG1 if not self.revealed else BKGR1
     
     def is_hovered(self):
         if self.rect.collidepoint(mouse_pos):
@@ -198,7 +223,68 @@ def set_level(difficulty):
                     if t.type == -1:
                         neighbours_mines += 1
                 tile.set_type(neighbours_mines)
-    return Map, rows, cols, mines
+    return Map, rows, cols, mines, True, False
+
+
+def GameOver():
+    global game_over, final_time
+    final_time = time()-start_time
+    game_over = True
+    for y, row in enumerate(Map):
+        for x, tile in enumerate(row):
+            if tile.type == -1:
+                tile.revealed = True
+
+
+def Win():
+    global game_over, final_time
+    final_time = time()-start_time
+    game_over = True
+
+
+def check_all_revealed():
+    for y, row in enumerate(Map):
+        for x, tile in enumerate(row):
+            if tile.type != -1:
+                if not tile.revealed:
+                    return False
+    return True
+
+    
+def reveal(tile):
+    global first_click, start_time
+    if first_click:
+        first_click = False
+        start_time = time()
+    tile.reveal()
+    if tile.type != 0:
+        if tile.type == -1:
+            GameOver()
+        elif check_all_revealed():
+            if current_mines == 0:
+                Win()
+    else:
+        currents = [tile]
+        while currents:
+            for t in currents:
+                for n in t.get_neighbours(Map, cols, rows):
+                    if not n in currents and n.type != -1 and not n.revealed:
+                        if n.type == 0:
+                            currents.append(n)
+                        n.reveal()
+                currents.remove(t)
+        if check_all_revealed():
+            if current_mines == 0:
+                Win()
+
+
+def flag(tile):
+    global first_click, start_time
+    if first_click:
+        first_click = False
+        start_time = time()
+    if not tile.revealed:
+        tile.flaged = not tile.flaged
 
 
 try:
@@ -230,19 +316,35 @@ try:
         
         for y, row in enumerate(Map):
             for x, tile in enumerate(row):
-                # if tile.is_hovered():
-                #     pygame.draw.rect(win, tile.hovered_color, (x*TILE_SIZE, 35 + y*TILE_SIZE, TILE_SIZE, TILE_SIZE))
-                # else:
-                #     pygame.draw.rect(win, tile.color, (x*TILE_SIZE, 35 + y*TILE_SIZE, TILE_SIZE, TILE_SIZE))
-                if tile.type == 0:
-                    pygame.draw.rect(win, 'gray', (x*TILE_SIZE, 35 + y*TILE_SIZE, TILE_SIZE, TILE_SIZE))
-                elif tile.type == -1:
-                    pygame.draw.rect(win, 'red', (x*TILE_SIZE, 35 + y*TILE_SIZE, TILE_SIZE, TILE_SIZE))
+                hovered = tile.is_hovered()
+                
+                if hovered and not dc.is_hovered_exp() and not game_over:
+                    if left_click:
+                        reveal(tile)
+                    elif right_click:
+                        flag(tile)
+                
+                if hovered and not (tile.revealed and tile.type == 0):
+                    pygame.draw.rect(win, tile.hovered_color, (x*TILE_SIZE, 35 + y*TILE_SIZE, TILE_SIZE, TILE_SIZE))
                 else:
                     pygame.draw.rect(win, tile.color, (x*TILE_SIZE, 35 + y*TILE_SIZE, TILE_SIZE, TILE_SIZE))
-                    blit_center(win, menu_font.render(str(tile.type), True, 'black'), tile.rect.center)
+                
+                if tile.revealed and tile.type != 0:
+                    if tile.type == -1:
+                        pygame.draw.rect(win, 'red', (x*TILE_SIZE, 35 + y*TILE_SIZE, TILE_SIZE, TILE_SIZE))
+                    else:
+                        blit_center(win, menu_font.render(str(tile.type), True, 'black'), tile.rect.center)
+                
+                elif tile.flaged:
+                    pygame.draw.rect(win, 'green', (x*TILE_SIZE, 35 + y*TILE_SIZE, TILE_SIZE, TILE_SIZE))
         
         blit_center(win, menu_font.render(str(current_mines), True, COLOR2), (WIN_SIZE[0]-200, 17))
+        if first_click:
+            start_time = time()
+        if not game_over:
+            blit_center(win, menu_font.render(str(ctime(time()-start_time)[14:19]), True, COLOR2), (WIN_SIZE[0]-100, 17))
+        else:
+            blit_center(win, menu_font.render(str(ctime(final_time)[14:19]), True, COLOR2), (WIN_SIZE[0]-100, 17))
         
         dc.update()
         dc.render()
