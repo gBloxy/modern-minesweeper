@@ -8,6 +8,12 @@ pygame.init()
 
 WIN_SIZE = [600, 635]
 
+win = pygame.display.set_mode(WIN_SIZE)
+pygame.display.set_caption('MineSweeper')
+
+clock = pygame.time.Clock()
+
+
 TILE_SIZE = 40
 
 COLOR = (248, 238, 187)
@@ -17,29 +23,13 @@ LIGHT_COLOR = (255, 252, 240)
 BKG1 = (25, 27, 45)
 BKG2 = (23, 25, 40)
 
-BKGR1 = (53, 55, 75)
-BKGR2 = (57, 59, 80)
+BKGR1 = (57, 59, 80)
+BKGR2 = (53, 55, 75)
+
+nb_colors = {1: 'blue', 2: 'green', 3: 'red', 4: 'darkblue', 5: 'darkred', 6: 'purple', 7: 'black', 8:'darkgray'}
 
 
-win = pygame.display.set_mode(WIN_SIZE)
-pygame.display.set_caption('MineSweeper')
-
-clock = pygame.time.Clock()
-
-
-menu_font = pygame.font.Font('JetBrainsMono-SemiBold.ttf', 25)
-
-
-ADJACENTS = [
-    (1, 0),
-    (1, 1),
-    (0, 1),
-    (-1, 1),
-    (-1, 0),
-    (-1, -1),
-    (0, -1),
-    (1, -1)
-]
+ADJACENTS = [(1, 0), (1, 1), (0, 1), (-1, 1), (-1, 0), (-1, -1), (0, -1), (1, -1)]
 
 
 levels = {
@@ -48,6 +38,28 @@ levels = {
     'tile' : {1: 40, 2: 40, 3: 30, 4: 20},
     'mines': {1: 12, 2: 36, 3: 100, 4: 250}
 }
+
+
+menu_font = pygame.font.Font('JetBrainsMono-SemiBold.ttf', 25)
+menu_rect = pygame.Rect(0, 0, levels['win'][4], 35)
+
+reload_img = pygame.transform.scale(pygame.image.load('reload_icon.png'), (25, 25)).convert_alpha()
+reload_rect = reload_img.get_rect(center=(160, 17))
+
+sound_on_img = pygame.transform.scale(pygame.image.load('sound_on.png'), (25, 25)).convert_alpha()
+sound_off_img = pygame.transform.scale(pygame.image.load('sound_off.png'), (25, 25)).convert_alpha()
+sound_rect = sound_on_img.get_rect(center=(WIN_SIZE[0]-25, 17))
+
+sound = True
+sound_switch_timer = 0
+refresh_sound = pygame.mixer.Sound('refresh.mp3')
+
+
+numbers = {}
+for tile_size in levels['tile'].values():
+    numbers[tile_size] = {}
+    for nb in range(1, 9):
+        numbers[tile_size][nb] = pygame.transform.scale(menu_font.render(str(nb), True, nb_colors[nb]), (tile_size-8, tile_size-4))
 
 
 def blit_center(surface, surf, center, *args, **kwargs):
@@ -194,12 +206,13 @@ class Tile():
 
 
 def set_level(difficulty):
-    global WIN_SIZE, TILE_SIZE, win
+    global WIN_SIZE, TILE_SIZE, win, sound_rect
      # load variables
     rows = cols = levels['map'][difficulty]
     WIN_SIZE = [levels['win'][difficulty], levels['win'][difficulty] + 35]
     win = pygame.display.set_mode(WIN_SIZE)
     TILE_SIZE = levels['tile'][difficulty]
+    sound_rect = sound_on_img.get_rect(center=(WIN_SIZE[0]-25, 17))
     
     # create raw map
     Map = [[Tile(x, y) for x in range(cols)] for y in range(rows)]
@@ -233,7 +246,7 @@ def GameOver():
     for y, row in enumerate(Map):
         for x, tile in enumerate(row):
             if tile.type == -1:
-                tile.revealed = True
+                tile.reveal()
 
 
 def Win():
@@ -287,11 +300,18 @@ def flag(tile):
         tile.flaged = not tile.flaged
 
 
+def reset():
+    global Map, rows, cols, current_mines, first_click, game_over
+    Map, rows, cols, current_mines, first_click, game_over = set_level(dc.diff_nb[dc.current_diff])
+    if sound:
+        refresh_sound.play()
+
+
 try:
     dc = DifficultyChooser()
     
     while True:
-        clock.tick(30)
+        dt = clock.tick(30)
         events = pygame.event.get()
         keys = pygame.key.get_pressed()
         left_click = False
@@ -312,13 +332,32 @@ try:
         
         win.fill('white')
         
+        if sound_switch_timer > 0:
+            sound_switch_timer -= dt
+        if (keys[pygame.K_m] or (left_click and sound_rect.collidepoint(mouse_pos))) and sound_switch_timer <= 0:
+            sound = not sound
+            sound_switch_timer = 300
+        
         pygame.draw.rect(win, 'black', (0, 0, WIN_SIZE[1], 35))
+        
+        ui_hovered = False
+        if menu_rect.collidepoint(mouse_pos):
+            ui_hovered = True
+        if dc.expanded and not ui_hovered:
+            if dc.is_hovered_exp():
+                ui_hovered = True
+        
+        if (ui_hovered and left_click):
+            if reload_rect.collidepoint(mouse_pos):
+                reset()
+        if keys[pygame.K_F5] or (keys[pygame.K_LCTRL] and keys[pygame.K_r]):
+            reset()
         
         for y, row in enumerate(Map):
             for x, tile in enumerate(row):
                 hovered = tile.is_hovered()
                 
-                if hovered and not dc.is_hovered_exp() and not game_over:
+                if hovered and not ui_hovered and not game_over:
                     if left_click:
                         reveal(tile)
                     elif right_click:
@@ -333,26 +372,30 @@ try:
                     if tile.type == -1:
                         pygame.draw.rect(win, 'red', (x*TILE_SIZE, 35 + y*TILE_SIZE, TILE_SIZE, TILE_SIZE))
                     else:
-                        blit_center(win, menu_font.render(str(tile.type), True, 'black'), tile.rect.center)
+                        blit_center(win, numbers[TILE_SIZE][tile.type], tile.rect.center)
                 
                 elif tile.flaged:
                     pygame.draw.rect(win, 'green', (x*TILE_SIZE, 35 + y*TILE_SIZE, TILE_SIZE, TILE_SIZE))
         
-        blit_center(win, menu_font.render(str(current_mines), True, COLOR2), (WIN_SIZE[0]-200, 17))
+        blit_center(win, menu_font.render(str(current_mines), True, COLOR2), (WIN_SIZE[0]-80, 17))
         if first_click:
             start_time = time()
         if not game_over:
-            blit_center(win, menu_font.render(str(ctime(time()-start_time)[14:19]), True, COLOR2), (WIN_SIZE[0]-100, 17))
+            blit_center(win, menu_font.render(str(ctime(time()-start_time)[14:19]), True, COLOR2),
+                        (WIN_SIZE[0]/2 + 40 if dc.current_diff == 'easy' else WIN_SIZE[0]/2, 17))
         else:
-            blit_center(win, menu_font.render(str(ctime(final_time)[14:19]), True, COLOR2), (WIN_SIZE[0]-100, 17))
+            blit_center(win, menu_font.render(str(ctime(final_time)[14:19]), True, COLOR2),
+                        (WIN_SIZE[0]/2 + 40 if dc.current_diff == 'easy' else WIN_SIZE[0]/2, 17))
         
         dc.update()
         dc.render()
         
-        # for x in range(1, cols):
-        #     pygame.draw.line(win, COLOR, (x*TILE_SIZE, 37), (x*TILE_SIZE, WIN_SIZE[1]))
-        # for y in range(1, rows):
-        #     pygame.draw.line(win, COLOR, (0, 35+y*TILE_SIZE), (WIN_SIZE[0], 35+y*TILE_SIZE))
+        if sound:
+            win.blit(sound_on_img, sound_rect)
+        else:
+            win.blit(sound_off_img, sound_rect)
+        
+        win.blit(reload_img, reload_rect)
         
         pygame.display.flip()
         
