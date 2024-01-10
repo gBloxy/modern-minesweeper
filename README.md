@@ -1,14 +1,13 @@
 # g_Bloxy's Minesweeper
 
 This is a classic minesweeper game with a modern look made in [python](https://www.python.org) with pygame.  
-The game features four levels of difficulty from easy to extreme with cool sounds and particles effects.
+The game features four levels of difficulty from easy to extreme with cool particles effects.
 
 ## Screenshots
 
 ## Play the game
 
 Extract the .zip file and just execute the MineSweeper.py file inside the game folder.
-You can also download the windows executable version on itch.io [here](https://g-bloxy.itch.io).
 
 ## Requirements
 
@@ -20,7 +19,7 @@ pip install pygame
 
 ## Contributing
  
-If you encounter any issues, have suggestions, or need support, please don't hesitate to reach out by creating an issue in the repository or leaving a comment on the itch.io page.  
+If you encounter any issues, have suggestions, or need support, please don't hesitate to reach out by creating an issue in the repository.  
 All feedbacks are welcome.
 
 ## Credits
