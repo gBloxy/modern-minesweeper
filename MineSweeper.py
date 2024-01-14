@@ -1,17 +1,21 @@
 
-from sys import exit
-from random import randint, choice
+from random import randint, uniform
 from time import time, ctime
 from math import cos, sin, radians
+from ctypes import windll
+from sys import exit
 import pygame
-from pygame.math import Vector2
-pygame.init()
 
+
+windll.shcore.SetProcessDpiAwareness(2) # avoid windows auto rescaling to make visible the entire window on low resolutions screens
+pygame.init()
 
 WIN_SIZE = [600, 635]
 
 win = pygame.display.set_mode(WIN_SIZE)
-pygame.display.set_caption('MineSweeper')
+
+pygame.display.set_caption('Minesweeper')
+pygame.display.set_icon(pygame.image.load('asset\\logo2.png'))
 
 clock = pygame.time.Clock()
 
@@ -28,9 +32,6 @@ BKG2 = (23, 25, 40)
 BKGR1 = (57, 59, 80)
 BKGR2 = (53, 55, 75)
 
-nb_colors = {1: 'blue', 2: 'green', 3: 'red', 4: 'darkblue', 5: 'darkred', 6: 'purple', 7: 'black', 8:'darkgray'}
-
-
 ADJACENTS = [(1, 0), (1, 1), (0, 1), (-1, 1), (-1, 0), (-1, -1), (0, -1), (1, -1)]
 
 
@@ -38,18 +39,57 @@ levels = {
     'map'  : {1: 10, 2: 15, 3: 25, 4: 40},
     'win'  : {1: 400, 2: 600, 3: 750, 4: 800},
     'tile' : {1: 40, 2: 40, 3: 30, 4: 20},
-    'mines': {1: 12, 2: 36, 3: 100, 4: 250}
+    'mines': {1: 12, 2: 35, 3: 100, 4: 250}
 }
+
+themes = {
+    1: {
+        'colors': {1: 'blue', 2: 'green', 3: 'red', 4: 'darkblue', 5: 'darkred', 6: 'purple', 7: 'black', 8:'darkgray'},
+        'size': {40: 25, 30: 20, 20: 12},
+        'flag': 'flag.png'
+        },
+    2: {
+        'colors': {1: 'blue4', 2: 'green4', 3: 'red3', 4: 'darkblue', 5: 'darkred', 6: 'purple3', 7: 'black', 8: 'darkgray'},
+        'size': {40: 25, 30: 20, 20: 12},
+        'flag': 'flag.png'
+        },
+    3: {
+        'colors': {1: 'yellow', 2: 'orange', 3: 'orangered', 4: 'red3', 5: 'darkred', 6: 'purple', 7: 'black', 8: 'darkgray'},
+        'size': {40: 18, 30: 15, 20: 9},
+        'flag': 'flag2.png',
+        'letters': {1: 'I', 2: 'II', 3: 'III', 4: 'IV', 5:'V', 6:'VI', 7:'VII', 8:'VIII'}
+        }
+    }
+
+
+def load_theme(theme):
+    global flag_img, numbers
+    flag_img = pygame.image.load('asset\\'+themes[theme]['flag']).convert_alpha()
+    numbers = {}
+    for tile_size in levels['tile'].values():
+        numbers[tile_size] = {}
+        font = pygame.font.Font('asset\\JetBrainsMono-SemiBold.ttf', themes[theme]['size'][tile_size])
+        for nb in range(1, 9):
+            numbers[tile_size][nb] = font.render(
+                str(nb) if theme != 3 else themes[theme]['letters'][nb], True, themes[theme]['colors'][nb])
+
+
+def load_sound(name, volume=1):
+    s = pygame.mixer.Sound('asset\\'+name)
+    s.set_volume(volume)
+    return s
 
 
 menu_font = pygame.font.Font('asset\\JetBrainsMono-SemiBold.ttf', 25)
 menu_rect = pygame.Rect(0, 0, levels['win'][4], 35)
 
-flag_img = pygame.image.load('asset\\flag.png').convert_alpha()
 mine_img = pygame.image.load('asset\\mine.png').convert_alpha()
 
 reload_img = pygame.transform.scale(pygame.image.load('asset\\reload_icon.png'), (25, 25)).convert_alpha()
 reload_rect = reload_img.get_rect(center=(160, 17))
+
+flag_icon = pygame.image.load('asset\\flag_icon.png').convert_alpha()
+time_icon =  pygame.transform.scale(pygame.image.load('asset\\time_icon.png'), (20, 23)).convert_alpha()
 
 sound_on_img = pygame.transform.scale(pygame.image.load('asset\\sound_on.png'), (25, 25)).convert_alpha()
 sound_off_img = pygame.transform.scale(pygame.image.load('asset\\sound_off.png'), (25, 25)).convert_alpha()
@@ -57,15 +97,16 @@ sound_rect = sound_on_img.get_rect(center=(WIN_SIZE[0]-25, 17))
 
 sound = True
 sound_switch_timer = 0
-refresh_sound = pygame.mixer.Sound('asset\\refresh.mp3')
-refresh_sound.set_volume(0.3)
+refresh_sound = load_sound('refresh.mp3', 0.2)
+click_sound = load_sound('click_sound.wav', 0.6)
+exp_sound = load_sound('explosion_sound.wav')
+flag_sound = load_sound('flag_sound.wav', 0.2)
+win_sound = load_sound('win_sound.wav', 0.9)
 
+load_theme(3)
 
-numbers = {}
-for tile_size in levels['tile'].values():
-    numbers[tile_size] = {}
-    for nb in range(1, 9):
-        numbers[tile_size][nb] = pygame.transform.scale(menu_font.render(str(nb), True, nb_colors[nb]), (tile_size-10, tile_size-4))
+screen_shake = False
+screen_shake_timer = 0
 
 
 def blit_center(surface, surf, center, *args, **kwargs):
@@ -95,17 +136,17 @@ class Tile():
         elif not value and self._flaged:
             current_mines += 1
         self._flaged = value
+        
+    def set_type(self, type):
+        self.type = type
     
     def reveal(self):
         self.revealed = True
         if self.flaged:
             self.flaged = False
         self.get_color()
-        for i in range(30 if self.type != -1 else 100):
+        for i in range(self.get_particles_nb(dc.diff_nb[dc.current_diff])):
             particles.append(Particle(self.rect.center, (255, 0, 0, 255) if self.type == -1 else 'purple'))
-    
-    def set_type(self, type):
-        self.type = type
     
     def get_color(self):
         if self.x % 2 == 0:
@@ -118,6 +159,16 @@ class Tile():
                 self.color = BKG2 if not self.revealed else BKGR2
             else:
                 self.color = BKG1 if not self.revealed else BKGR1
+    
+    def get_particles_nb(self, diff):
+        if self.type != -1:
+            return 30
+        elif diff < 3:
+            return 100
+        elif diff == 3:
+            return 40
+        else:
+            return 20
     
     def is_hovered(self):
         if self.rect.collidepoint(mouse_pos):
@@ -200,6 +251,14 @@ class DifficultyChooser():
                 index += 1
         Map, rows, cols, current_mines, first_click, game_over = set_level(self.diff_nb[diff])
     
+    def is_hovered_exp(self):
+        hovered = self.hovered
+        if not hovered and self.expanded:
+            for opt in self.options.values():
+                if opt['rect'].collidepoint(mouse_pos):
+                    hovered = True
+        return hovered
+    
     def update(self):
         if self.rect.collidepoint(mouse_pos):
             self.hovered = True
@@ -214,14 +273,6 @@ class DifficultyChooser():
                 for opt in self.options.values():
                     if opt['rect'].collidepoint(mouse_pos):
                         self.set_difficulty(opt['name'])
-    
-    def is_hovered_exp(self):
-        hovered = self.hovered
-        if not hovered and self.expanded:
-            for opt in self.options.values():
-                if opt['rect'].collidepoint(mouse_pos):
-                    hovered = True
-        return hovered
     
     def render(self):
         self.image.fill((0, 0, 0, 0))
@@ -273,20 +324,20 @@ def set_level(difficulty):
     return Map, rows, cols, mines, True, False
 
 
-def GameOver():
-    global game_over, final_time
-    final_time = time()-start_time
-    game_over = True
-    for y, row in enumerate(Map):
-        for x, tile in enumerate(row):
-            if tile.type == -1:
-                tile.reveal()
+def calculate_screen_shake_timer(num_destroyed_tiles):
+    base_shake_duration = 500
+    max_tiles_for_scaling = 10
+    scaling_factor = min(num_destroyed_tiles / max_tiles_for_scaling, 1.0)
+    scaled_shake_timer = base_shake_duration * scaling_factor
+    random_factor = uniform(0.8, 1.2)
+    scaled_shake_timer *= random_factor
+    return round(scaled_shake_timer)
 
 
-def Win():
-    global game_over, final_time
-    final_time = time()-start_time
-    game_over = True
+def set_screen_shake(duration):
+    global screen_shake, screen_shake_timer
+    screen_shake = True
+    screen_shake_timer = duration
 
 
 def check_all_revealed():
@@ -297,7 +348,28 @@ def check_all_revealed():
                     return False
     return True
 
-    
+
+def Win():
+    global game_over, final_time
+    final_time = time()-start_time
+    game_over = True
+    if sound:
+        win_sound.play()
+
+
+def GameOver():
+    global game_over, final_time
+    final_time = time()-start_time
+    game_over = True
+    if sound:
+        exp_sound.play()
+    set_screen_shake(1000)
+    for y, row in enumerate(Map):
+        for x, tile in enumerate(row):
+            if tile.type == -1:
+                tile.reveal()
+
+
 def reveal(tile):
     global first_click, start_time
     if first_click:
@@ -311,6 +383,7 @@ def reveal(tile):
             Win()
     else:
         currents = [tile]
+        revealed_tiles = 1
         while currents:
             for t in currents:
                 for n in t.get_neighbours(Map, cols, rows):
@@ -318,7 +391,10 @@ def reveal(tile):
                         if n.type == 0:
                             currents.append(n)
                         n.reveal()
+                        revealed_tiles += 1
                 currents.remove(t)
+        if revealed_tiles > 4:
+            set_screen_shake(calculate_screen_shake_timer(revealed_tiles))
         if current_mines == 0 and check_all_revealed():
             Win()
 
@@ -328,8 +404,12 @@ def flag(tile):
     if first_click:
         first_click = False
         start_time = time()
-    if not tile.revealed:
-        tile.flaged = not tile.flaged
+    tile.flaged = not tile.flaged
+    if sound:
+        if tile.flaged:
+            flag_sound.play()
+        else:
+            ...
     if current_mines == 0 and check_all_revealed():
         Win()
 
@@ -365,13 +445,21 @@ try:
                 exit()
         mouse_pos = pygame.mouse.get_pos()
         
-        win.fill('white')
-        
         if sound_switch_timer > 0:
             sound_switch_timer -= dt
         if (keys[pygame.K_m] or (left_click and sound_rect.collidepoint(mouse_pos))) and sound_switch_timer <= 0:
             sound = not sound
             sound_switch_timer = 300
+        
+        if screen_shake:
+            screen_shake_timer -= dt
+            if screen_shake_timer <= 0:
+                screen_shake = False
+            power = round(screen_shake_timer/12)
+            offset = [randint(0, max(power, 1)) - power/2, 35 + randint(0, max(power, 1)) - power/2]
+            win.fill('black')
+        else:
+            offset = [0, 35]
         
         pygame.draw.rect(win, 'black', (0, 0, WIN_SIZE[1], 35))
         
@@ -392,27 +480,29 @@ try:
             for x, tile in enumerate(row):
                 hovered = tile.is_hovered()
                 
-                if hovered and not ui_hovered and not game_over:
+                if hovered and not ui_hovered and not game_over and not tile.revealed:
                     if left_click and not tile.flaged:
                         reveal(tile)
+                        if sound:
+                            click_sound.play()
                     elif right_click:
                         flag(tile)
                 
                 if hovered and not (tile.revealed and (tile.type == 0 or tile.type == -1)):
-                    pygame.draw.rect(win, tile.hovered_color, (x*TILE_SIZE, 35 + y*TILE_SIZE, TILE_SIZE, TILE_SIZE))
+                    pygame.draw.rect(win, tile.hovered_color, (x*TILE_SIZE + offset[0], y*TILE_SIZE + offset[1], TILE_SIZE, TILE_SIZE))
                 else:
-                    pygame.draw.rect(win, tile.color, (x*TILE_SIZE, 35 + y*TILE_SIZE, TILE_SIZE, TILE_SIZE))
+                    pygame.draw.rect(win, tile.color, (x*TILE_SIZE + offset[0], y*TILE_SIZE + offset[1], TILE_SIZE, TILE_SIZE))
                 
                 if tile.revealed and tile.type != 0:
                     if tile.type == -1:
                         img = mine_img if TILE_SIZE == 40 else pygame.transform.scale(mine_img, (TILE_SIZE, TILE_SIZE))
-                        win.blit(img, (x*TILE_SIZE, 35 + y*TILE_SIZE))
+                        win.blit(img, (x*TILE_SIZE + offset[0], y*TILE_SIZE + offset[1]))
                     else:
-                        blit_center(win, numbers[TILE_SIZE][tile.type], tile.rect.center)
+                        blit_center(win, numbers[TILE_SIZE][tile.type], (tile.rect.centerx + offset[0], tile.rect.centery + offset[1] - 35))
                 
                 elif tile.flaged:
                     img = flag_img if TILE_SIZE == 40 else pygame.transform.scale(flag_img, (TILE_SIZE, TILE_SIZE))
-                    win.blit(img, (x*TILE_SIZE, 35 + y*TILE_SIZE))
+                    win.blit(img, (x*TILE_SIZE + offset[0], y*TILE_SIZE + offset[1]))
         
         for p in particles:
             p.update(dt)
@@ -421,15 +511,18 @@ try:
             else:
                 p.render(win)
         
-        blit_center(win, menu_font.render(str(current_mines), True, COLOR2), (WIN_SIZE[0]-80, 17))
+        blit_center(win, menu_font.render(str(current_mines), True, COLOR2), (WIN_SIZE[0]-(80 if dc.current_diff != 'easy' else 62), 17))
+        blit_center(win, flag_icon, (WIN_SIZE[0]-(80 if dc.current_diff != 'easy' else 55) - flag_icon.get_width() - 20, 17))
+        
         if first_click:
             start_time = time()
         if not game_over:
-            blit_center(win, menu_font.render(str(ctime(time()-start_time)[14:19]), True, COLOR2),
-                        (WIN_SIZE[0]/2 + 40 if dc.current_diff == 'easy' else WIN_SIZE[0]/2, 17))
+            img = menu_font.render(str(ctime(time()-start_time)[14:19]), True, COLOR2)
         else:
-            blit_center(win, menu_font.render(str(ctime(final_time)[14:19]), True, COLOR2),
-                        (WIN_SIZE[0]/2 + 40 if dc.current_diff == 'easy' else WIN_SIZE[0]/2, 17))
+            img = menu_font.render(str(ctime(final_time)[14:19]), True, COLOR2)
+        
+        blit_center(win, img, (WIN_SIZE[0]/2 + (52 if dc.current_diff == 'easy' else img.get_width()/2), 17))
+        blit_center(win, time_icon, (WIN_SIZE[0]/2 - (6 if dc.current_diff == 'easy' else time_icon.get_width()/2 + 10), 17))
         
         dc.update()
         dc.render()
