@@ -130,8 +130,7 @@ themes_name_imgs = [
     temp_font.render('classic theme', True, COLOR),
     temp_font.render('theme 3', True, COLOR),
     temp_font.render('theme 4', True, COLOR),
-    temp_font.render('theme 5', True, COLOR)
-]
+    temp_font.render('theme 5', True, COLOR)]
 
 sound = True
 sound_switch_timer = 0
@@ -139,6 +138,7 @@ refresh_sound = load_sound('refresh.mp3', 0.2)
 click_sound = load_sound('click_sound.wav', 0.6)
 exp_sound = load_sound('explosion_sound.wav')
 flag_sound = load_sound('flag_sound.wav', 0.2)
+unflag_sound = load_sound('unflag_sound.wav', 0.5)
 win_sound = load_sound('win_sound.wav', 0.9)
 
 load_theme(1)
@@ -183,7 +183,7 @@ class Tile():
             self.flaged = False
         self.get_color()
         for i in range(self.get_particles_nb(dc.diff_nb[dc.current_diff])):
-            particles.append(Particle(self.rect.center, (255, 0, 0, 255) if self.type == -1 else 'purple'))
+            particles.append(Particle(self.rect.center, 'red' if self.type == -1 else 'purple'))
     
     def get_color(self):
         if self.x % 2 == 0:
@@ -230,10 +230,7 @@ class Particle():
         self.rect = pygame.Rect(*center, width, width)
         self.speed = randint(8, 12)
         self.angle = randint(-180, 180)
-        if type(color) == str:
-            self.color = list(pygame.colordict.THECOLORS[color])
-        else:
-            self.color = list(color)
+        self.color = list(pygame.colordict.THECOLORS[color])
         self.image = pygame.Surface((width, width), pygame.SRCALPHA)
         self.alive = True
         
@@ -508,7 +505,7 @@ def flag(tile):
         if tile.flaged:
             flag_sound.play()
         else:
-            ...
+            unflag_sound.play()
     if current_mines == 0 and check_all_revealed():
         Win()
 
