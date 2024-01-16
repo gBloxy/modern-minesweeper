@@ -7,8 +7,8 @@ Link to the itch.io game page : [minesweeper](https://g-bloxy.itch.io/minesweepe
 ## Screenshots
 
 ![cover_img](https://github.com/gBloxy/modern-minesweeper/assets/121670440/46cae59a-4cba-42ea-bc00-e33f68784eb1)  
-![theme screen](https://github.com/gBloxy/modern-minesweeper/assets/121670440/bf9658bf-fa4e-4281-b7a0-ca40f9fb7c32)
-![extreme-classic](https://github.com/gBloxy/modern-minesweeper/assets/121670440/19a1841f-a789-41ee-8cca-233385019cc0)
+![theme screen](https://github.com/gBloxy/modern-minesweeper/assets/121670440/74a6964c-ef37-478d-a5a5-6224bc0d1d9f)
+![extreme-classic](https://github.com/gBloxy/modern-minesweeper/assets/121670440/953ccb0a-326b-4981-972a-865530fb04b9)
 
 ## Gameplay
 
