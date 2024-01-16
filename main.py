@@ -5,14 +5,9 @@ from math import cos, sin, radians
 from sys import exit
 import asyncio
 
-try:
-    def messagebox(text, title='Info'):
-        from tkinter import messagebox as msgbox
-        msgbox.showinfo(title, text)
-except:
-    def messagebox(text, *args, **kwargs):
-        import platform
-        platform.window.alert(text)
+def messagebox(text):
+    import platform
+    platform.window.alert(text)
 
 try:
     from ctypes import windll
@@ -152,7 +147,7 @@ themes_name_imgs = [
 
 sound = True
 sound_switch_timer = 0
-refresh_sound = load_sound("refresh.mp3", 0.2)
+refresh_sound = load_sound("refresh.ogg", 0.2)
 click_sound = load_sound("click_sound.wav", 0.6)
 exp_sound = load_sound("explosion_sound.wav")
 flag_sound = load_sound("flag_sound.wav", 0.2)
@@ -378,8 +373,7 @@ class Settings:
 
     def show_keys(self):
         messagebox(
-            "Press [ECHAP] to quit\n[m] to switch sound\nReveal a tile : left click\nFlag / unflag a tile : right click",
-            title="Controls"
+            "Controls :\nPress [ECHAP] to quit\n[m] to switch sound\nReveal a tile : left click\nFlag / unflag a tile : right click"
         )
 
     def update(self):
