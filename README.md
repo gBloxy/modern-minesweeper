@@ -24,7 +24,7 @@ Minesweeper is a classic game where you navigate through a grid of squares. The 
 
 ## Play the game
 
-Extract the .zip file and just execute the MineSweeper.py file inside the game folder.
+Extract the .zip file and just execute the Minesweeper.py file inside the game folder.
 
 ## Requirements
 
