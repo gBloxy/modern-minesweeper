@@ -43,7 +43,7 @@ All feedbacks are welcome.
 
 This game and all its images were made by g_Bloxy.  
 Font used : Jet Brain Mono Semi Bold from [JetBrains](https://www.jetbrains.com).  
-Sounds used are from [Zapslat.com](https://www.zapsplat.com) and internet.
+Sounds used are from [Zapslat.com](https://www.zapsplat.com), Arthur on [OpenGameArt](https://opengameart.org/users/arthur), and internet.
 
 ## License
 The game is licensed under the GPL-3.0 license - see the LICENSE file for details.
