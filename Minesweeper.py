@@ -7,9 +7,16 @@ from sys import exit
 import pygame
 import os
 
+
 if os.name == 'nt':
     from ctypes import windll
     windll.shcore.SetProcessDpiAwareness(2) # avoid windows auto rescaling to make visible the entire window on low resolutions screens
+elif os.name == 'posix':
+    os.environ['SDL_VIDEO_X11_NET_WM_DPI_SCALE'] = '1'
+
+
+# Pygame setup ----------------------------------------------------------------
+
 pygame.init()
 
 WIN_SIZE = [600, 635]
