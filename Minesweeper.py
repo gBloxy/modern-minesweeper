@@ -2,9 +2,9 @@
 from random import randint, uniform
 from time import time, ctime
 from math import cos, sin, radians
-from tkinter import messagebox
 from sys import exit
 import pygame
+from pygame._sdl2 import messagebox
 import os
 
 
@@ -12,8 +12,7 @@ if os.name == 'nt':
     from ctypes import windll
     windll.shcore.SetProcessDpiAwareness(2) # avoid windows auto rescaling to make visible the entire window on low resolutions screens
 elif os.name == 'posix':
-    os.environ['SDL_VIDEO_X11_NET_WM_DPI_SCALE'] = '1'
-
+    pass
 
 # Pygame setup ----------------------------------------------------------------
 
@@ -339,7 +338,7 @@ class DifficultyChooser():
 
 class Settings():
     def __init__(self):
-        self.image = pygame.Surface((350, 350), pygame.SRCALPHA)
+        self.image = pygame.Surface((350, 350))#, pygame.SRCALPHA)
         self.rect = self.image.get_rect(center=(WIN_SIZE[0]/2, WIN_SIZE[1]/2))
         self.image.blit(menu_font.render('Themes :', True, COLOR), (20, 70))
         self.sound_rect = sound_on_img.get_rect(center=(self.rect.right - 28, self.rect.top+25))
@@ -355,7 +354,7 @@ class Settings():
         self.controls_rect.topleft = (self.rect.left+20, self.rect.top+15)
     
     def show_keys(self):
-        messagebox.showinfo('Controls','Press [ECHAP] to quit\n[m] to switch sound\nReveal a tile : left click\nFlag / unflag a tile : right click')
+        messagebox('Controls','Press [ECHAP] to quit\n[m] to switch sound\nReveal a tile : left click\nFlag / unflag a tile : right click')
     
     def update(self):
         if self.rect.collidepoint(mouse_pos):
