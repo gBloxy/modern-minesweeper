@@ -1,14 +1,21 @@
 
-from random import randint, uniform
+from random import randint, uniform, choice
 from time import time, ctime
 from math import cos, sin, radians
 from tkinter import messagebox
-from ctypes import windll
+from os.path import exists, join
+from os import name
 from sys import exit
 import pygame
 
 
-windll.shcore.SetProcessDpiAwareness(2) # avoid windows auto rescaling to make visible the entire window on low resolutions screens
+if name == 'nt':
+    from ctypes import windll
+    windll.shcore.SetProcessDpiAwareness(2) # avoid windows auto rescaling to make visible the entire window on low resolutions screens
+
+
+# Pygame setup ----------------------------------------------------------------
+
 pygame.init()
 
 WIN_SIZE = [600, 635]
@@ -16,7 +23,7 @@ WIN_SIZE = [600, 635]
 win = pygame.display.set_mode(WIN_SIZE)
 
 pygame.display.set_caption('Minesweeper')
-pygame.display.set_icon(pygame.image.load('asset\\logo2.png'))
+pygame.display.set_icon(pygame.image.load(join('asset', 'logos', 'logo2.png')))
 
 clock = pygame.time.Clock()
 
@@ -49,16 +56,19 @@ themes = {
     0: {
         'colors': {1: 'blue', 2: 'green', 3: 'red', 4: 'darkblue', 5: 'darkred', 6: 'purple', 7: 'black', 8:'darkgray'},
         'size': {40: 25, 30: 20, 20: 12},
-        'flag': 'flag.png'
+        'flag': 'flag.png',
+        'name': 'theme',
+        'font': 'JetBrainsMono-SemiBold.ttf'
         },
     1: {
         'colors': {1: 'yellow', 2: 'orange', 3: 'orangered', 4: 'red3', 5: 'darkred', 6: 'lightgray', 7: 'darkgray', 8: 'black'},
         'size': {40: 18, 30: 15, 20: 9},
         'flag': 'flag2.png',
-        'letters': {1: 'I', 2: 'II', 3: 'III', 4: 'IV', 5:'V', 6:'VI', 7:'VII', 8: 'VI\nII'}
+        'letters': {1: 'I', 2: 'II', 3: 'III', 4: 'IV', 5:'V', 6:'VI', 7:'VII', 8: 'VI\nII'},
+        'name': 'main theme'
         },
     2: {
-        # classic theme (0)
+        'name': 'classic theme'
         },
     3: {
         'colors': {1: 'blue4', 2: 'green4', 3: 'red3', 4: 'darkblue', 5: 'darkred', 6: 'purple3', 7: 'black', 8: 'darkgray'}
@@ -71,6 +81,19 @@ themes = {
         'size': {40: 18, 30: 15, 20: 9},
         'flag': 'flag2.png',
         'letters': {1: 'I', 2: 'II', 3: 'III', 4: 'IV', 5:'V', 6:'VI', 7:'VII', 8: 'VI\nII'}
+        },
+    6: {
+        'flag': 'flag2.png',
+        'colors': {
+            1: 'LightBlue',
+            2: 'DeepSkyBlue',
+            3: 'DodgerBlue',
+            4: 'SteelBlue',
+            5: 'MediumSlateBlue',
+            6: 'DarkSlateBlue',
+            7: 'MediumPurple',
+            8: 'DarkSlateGray'
+        }
         }
     }
 
@@ -79,18 +102,18 @@ themes = {
 
 def load_theme(theme):
     global flag_img, numbers
-    flag_img = pygame.image.load('asset\\'+themes[theme]['flag']).convert_alpha()
+    flag_img = pygame.image.load(join('asset', 'images', themes[theme]['flag'])).convert_alpha()
     numbers = {}
     for tile_size in levels['tile'].values():
         numbers[tile_size] = {}
-        font = pygame.font.Font('asset\\JetBrainsMono-SemiBold.ttf', themes[theme]['size'][tile_size])
+        font = pygame.font.Font(join('asset', 'font', themes[theme]['font']), themes[theme]['size'][tile_size])
         for nb in range(1, 9):
             numbers[tile_size][nb] = font.render(
                 str(nb) if not 'letters' in themes[theme] else themes[theme]['letters'][nb], True, themes[theme]['colors'][nb])
 
 
 def load_sound(name, volume=1):
-    s = pygame.mixer.Sound('asset\\'+name)
+    s = pygame.mixer.Sound(join('asset', 'sounds', name))
     s.set_volume(volume)
     return s
 
@@ -101,39 +124,35 @@ def blit_center(surface, surf, center, *args, **kwargs):
 
 # load ressources -------------------------------------------------------------
 
-for theme in themes: # pre-load themes
+temp_font = pygame.font.Font(join('asset', 'font', 'JetBrainsMono-SemiBold.ttf'), 20)  # pre-load themes
+for theme in themes:
     for opt in themes[0]:
         if not opt in themes[theme]:
             themes[theme][opt] = themes[0][opt]
+    if theme != 0:
+        name = 'theme '+str(theme) if themes[theme]['name'] == 'theme' else themes[theme]['name']
+        themes[theme]['name_rendered'] = temp_font.render(name, True, COLOR)
+        img_name = join('asset', 'themes', 'theme'+str(theme)+'.png')
+        if exists(img_name):
+            themes[theme]['img'] = pygame.image.load(img_name).convert()
+        else:
+            themes[theme]['img'] = pygame.Surface((120, 120))
 
-menu_font = pygame.font.Font('asset\\JetBrainsMono-SemiBold.ttf', 25)
+menu_font = pygame.font.Font(join('asset', 'font', 'JetBrainsMono-SemiBold.ttf'), 25)
 menu_rect = pygame.Rect(0, 0, levels['win'][4], 35)
 
-mine_img = pygame.image.load('asset\\mine.png').convert_alpha()
+mine_img = pygame.image.load(join('asset', 'images', 'mine.png')).convert_alpha()
 
-reload_img = pygame.transform.scale(pygame.image.load('asset\\reload_icon.png'), (25, 25)).convert_alpha()
+reload_img = pygame.transform.scale(pygame.image.load(join('asset', 'icons', 'reload_icon.png')), (25, 25)).convert_alpha()
 reload_rect = reload_img.get_rect(center=(160, 17))
 
-settings_icon = pygame.transform.scale(pygame.image.load('asset\\settings_icon.png'), (22, 22)).convert_alpha()
+settings_icon = pygame.transform.scale(pygame.image.load(join('asset', 'icons', 'settings_icon.png')), (22, 22)).convert_alpha()
 settings_rect = settings_icon.get_rect(center=(WIN_SIZE[0]-25, 17))
 
-flag_icon = pygame.image.load('asset\\flag_icon.png').convert_alpha()
-time_icon =  pygame.transform.scale(pygame.image.load('asset\\time_icon.png'), (20, 23)).convert_alpha()
-
-sound_on_img = pygame.transform.scale(pygame.image.load('asset\\sound_on.png'), (25, 25)).convert_alpha()
-sound_off_img = pygame.transform.scale(pygame.image.load('asset\\sound_off.png'), (25, 25)).convert_alpha()
-
-themes_img = [pygame.image.load('asset\\theme'+str(i)+'.png').convert() for i in range(1, 6)]
-temp_font = pygame.font.Font('asset\\JetBrainsMono-SemiBold.ttf', 20)
-themes_name_imgs = [
-    temp_font.render('main theme', True, COLOR),
-    temp_font.render('classic theme', True, COLOR),
-    temp_font.render('theme 3', True, COLOR),
-    temp_font.render('theme 4', True, COLOR),
-    temp_font.render('theme 5', True, COLOR)]
+flag_icon = pygame.image.load(join('asset', 'icons', 'flag_icon.png')).convert_alpha()
+time_icon =  pygame.transform.scale(pygame.image.load(join('asset', 'icons', 'time_icon.png')), (20, 23)).convert_alpha()
 
 sound = True
-sound_switch_timer = 0
 refresh_sound = load_sound('refresh.mp3', 0.2)
 click_sound = load_sound('click_sound.wav', 0.6)
 exp_sound = load_sound('explosion_sound.wav')
@@ -145,6 +164,7 @@ load_theme(1)
 
 screen_shake = False
 screen_shake_timer = 0
+show_starting_tile = True
 
 
 # Tile class ------------------------------------------------------------------
@@ -276,7 +296,7 @@ class DifficultyChooser():
         self.hovered = False
     
     def set_difficulty(self, diff):
-        global Map, rows, cols, current_mines, first_click, game_over
+        global Map, rows, cols, current_mines, first_click, game_over, safe_tile
         self.current_diff = diff
         self.options = {}
         index = 0
@@ -288,7 +308,7 @@ class DifficultyChooser():
                     'index': index
                     }
                 index += 1
-        Map, rows, cols, current_mines, first_click, game_over = set_level(self.diff_nb[diff])
+        Map, rows, cols, current_mines, safe_tile, first_click, game_over = set_level(self.diff_nb[diff])
     
     def is_hovered_exp(self):
         hovered = self.hovered
@@ -329,51 +349,117 @@ class DifficultyChooser():
         win.blit(self.image, (0, 0))
 
 
+class SwitchButton():
+    def __init__(self, text, center, activated=True):
+        self.text_img = temp_font.render(text, True, COLOR)
+        self.img_rect = self.text_img.get_rect()
+        self.rect = pygame.Rect(0, 0, 50, 25)
+        self.state = activated
+        self.move(center)
+    
+    def move(self, center):
+        self.img_rect.midright = (center[0] - 5, center[1])
+        self.rect.midleft = (center[0] + 5, center[1])
+    
+    def toggle(self):
+        self.state = not self.state
+    
+    def update(self):
+        if self.rect.collidepoint(mouse_pos):
+            pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_HAND)
+            if left_click:
+                self.toggle()
+                return True
+        return None
+    
+    def render(self, surf):
+        surf.blit(self.text_img, self.img_rect)
+        if self.state:
+            pygame.draw.circle(surf, 'green', (self.rect.right - self.rect.width/3 + 4, self.rect.centery), self.rect.height/2-2)
+        else:
+            pygame.draw.circle(surf, 'red', (self.rect.left + self.rect.width/3 - 3, self.rect.centery), self.rect.height/2-2)
+        pygame.draw.rect(surf, COLOR, self.rect, 2, border_radius=75)
+
+
+controls_text = """Reveal a tile : left click
+Flag / unflag a tile : right click
+Reset the level : Ctrl+r or F5
+Switch sound : [m]
+Suggest a safe starting tile : [t]
+Open / close the settings menu : [s]
+Show this message again : [k]
+Quit the game : [ECHAP]"""
+
+
 class Settings():
     def __init__(self):
         self.image = pygame.Surface((350, 350), pygame.SRCALPHA)
         self.rect = self.image.get_rect(center=(WIN_SIZE[0]/2, WIN_SIZE[1]/2))
-        self.image.blit(menu_font.render('Themes :', True, COLOR), (20, 70))
-        self.sound_rect = sound_on_img.get_rect(center=(self.rect.right - 28, self.rect.top+25))
-        self.controls_img = pygame.font.Font('asset\\JetBrainsMono-SemiBold.ttf', 20).render('Controls', True, COLOR)
-        self.controls_rect = self.controls_img.get_rect(topleft=(self.rect.left+20, self.rect.top+15))
+        self.setup_ui()
+        self.themes_rects = [pygame.Rect(i*160 + 35, 172, 120, 120) for i in range(len(themes)-1)]
+        self.sound_button = SwitchButton('sound', (self.rect.left + 240, self.rect.top + 30))
+        self.safe_tile_button = SwitchButton('safe starting tile', (self.rect.left + 240, self.rect.top + 65))
         self.active = False
+    
+    def setup_ui(self):
+        self.image.fill((0, 0, 0, 140))
+        self.image.blit(menu_font.render('Themes :', True, COLOR), (20, 90))
+        close_button_img = menu_font.render('x', True, COLOR)
+        self.close_rect = close_button_img.get_rect(topleft=(self.image.get_width() - 32, 10))
+        self.image.blit(close_button_img, self.close_rect)
+        controls_img = pygame.font.Font(join('asset', 'font', 'JetBrainsMono-SemiBold.ttf'), 20).render('Controls', True, COLOR)
+        self.controls_rect = controls_img.get_rect(topleft=(self.rect.left + 20, self.rect.bottom - 45))
+        self.image.blit(controls_img, (20, self.rect.height - 45))
         self.image2 = pygame.Surface((350, 350), pygame.SRCALPHA)
-        self.themes_rects = [pygame.Rect(i*160 + 35, 172, 120, 120) for i in range(5)]
     
     def win_adapt(self):
         self.rect.center = (WIN_SIZE[0]/2, WIN_SIZE[1]/2)
-        self.sound_rect.center = (self.rect.right - 28, self.rect.top+25)
-        self.controls_rect.topleft = (self.rect.left+20, self.rect.top+15)
+        self.controls_rect.topleft = (self.rect.left + 20, self.rect.bottom - 45)
+        self.close_rect.topleft = (self.rect.right - 32, self.rect.top + 10)
+        self.sound_button.move((self.rect.left + 240, self.rect.top + 30))
+        self.safe_tile_button.move((self.rect.left + 240, self.rect.top + 65))
     
     def show_keys(self):
-        messagebox.showinfo('Controls','Press [ECHAP] to quit\n[m] to switch sound\nReveal a tile : left click\nFlag / unflag a tile : right click')
+        messagebox.showinfo('Controls', controls_text)
     
     def update(self):
+        global show_starting_tile
         if self.rect.collidepoint(mouse_pos):
+            pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_ARROW)
             if scrolling != 0:
                 for rect in self.themes_rects:
                     rect.x += 30 * scrolling
-            if left_click:
-                if self.controls_rect.collidepoint(mouse_pos):
+            if self.sound_button.update():
+                toggle_sound(switched=False)
+            if self.safe_tile_button.update():
+                show_starting_tile = not show_starting_tile
+            if self.close_rect.collidepoint(mouse_pos):
+                pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_HAND)
+                if left_click:
+                    pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_ARROW)
+                    self.active = False
+            if self.controls_rect.collidepoint(mouse_pos):
+                pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_HAND)
+                if left_click:
                     self.show_keys()
-                for i in range(5):
-                    if pygame.Rect(self.themes_rects[i].x + self.rect.left, self.themes_rects[i].y + self.rect.top, 120, 120).collidepoint(mouse_pos):
+            for i in range(len(themes)-1):
+                if pygame.Rect(self.themes_rects[i].x + self.rect.left, self.themes_rects[i].y + self.rect.top, 120, 120).collidepoint(mouse_pos):
+                    pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_HAND)
+                    if left_click:
                         load_theme(i+1)
     
     def render(self):
         win.blit(self.image, self.rect)
-        if sound:
-            win.blit(sound_on_img, self.sound_rect)
-        else:
-            win.blit(sound_off_img, self.sound_rect)
-        win.blit(self.controls_img, self.controls_rect)
+        if self.controls_rect.collidepoint(mouse_pos):
+            pygame.draw.rect(win, COLOR, (self.controls_rect.x, self.controls_rect.bottom - 2, self.controls_rect.width, 2))
         self.image2.fill((0, 0, 0, 0))
-        for i in range(5):
-            self.image2.blit(themes_img[i], self.themes_rects[i])
-            pygame.draw.rect(self.image2, COLOR, self.themes_rects[i], 2)
-            blit_center(self.image2, themes_name_imgs[i], (self.themes_rects[i].centerx, self.themes_rects[i].top - 25))
+        for i in range(1, len(themes)):
+            self.image2.blit(themes[i]['img'], self.themes_rects[i-1])
+            pygame.draw.rect(self.image2, COLOR, self.themes_rects[i-1], 2)
+            blit_center(self.image2, themes[i]['name_rendered'], (self.themes_rects[i-1].centerx, self.themes_rects[i-1].top - 25))
         win.blit(self.image2, self.rect)
+        self.sound_button.render(win)
+        self.safe_tile_button.render(win)
         pygame.draw.rect(win, COLOR, self.rect, 3)
 
 
@@ -387,7 +473,7 @@ def set_level(difficulty):
     win = pygame.display.set_mode(WIN_SIZE)
     TILE_SIZE = levels['tile'][difficulty]
     sett.win_adapt()
-    settings_rect = sound_on_img.get_rect(center=(WIN_SIZE[0]-25, 18))
+    settings_rect = settings_icon.get_rect(center=(WIN_SIZE[0]-25, 18))
     
     # create raw map
     Map = [[Tile(x, y) for x in range(cols)] for y in range(rows)]
@@ -415,18 +501,49 @@ def set_level(difficulty):
                     if t.type == -1:
                         neighbours_mines += 1
                 tile.set_type(neighbours_mines)
-    return Map, rows, cols, mines, True, False
+    
+    # determine safe tile
+    max_opening = ([], 0)
+    visited = set()
+    for y, row in enumerate(Map):
+        for x, tile in enumerate(row):
+            if not tile in visited and tile.type == 0:
+                opening = explore_opening(tile, visited, Map, cols, rows)
+                visited.update(opening[0])
+                if opening[1] > max_opening[1]:
+                    max_opening = opening
+    safe_tile = choice(max_opening[0])
+    return Map, rows, cols, mines, safe_tile, True, False
+
+
+def explore_opening(tile, visited, Map, cols, rows):
+    currents = [tile]
+    opening = [tile]
+    while currents:
+        for t in currents:
+            for n in t.get_neighbours(Map, cols, rows):
+                if n.type == 0 and not n in currents and not n in visited and not n in opening:
+                    currents.append(n)
+                    opening.append(n)
+            currents.remove(t)
+    return (opening, len(opening))
 
 
 # Game functions --------------------------------------------------------------
 
+def toggle_sound(key=False, switched=True):
+    global sound, key_timer
+    sound = not sound
+    if key:
+        key_timer = 300
+    if switched:
+        sett.sound_button.toggle()
+
+
 def calculate_screen_shake_timer(num_destroyed_tiles):
-    base_shake_duration = 500
-    max_tiles_for_scaling = 10
-    scaling_factor = min(num_destroyed_tiles / max_tiles_for_scaling, 1.0)
-    scaled_shake_timer = base_shake_duration * scaling_factor
-    random_factor = uniform(0.8, 1.2)
-    scaled_shake_timer *= random_factor
+    scaling_factor = min(num_destroyed_tiles / 10, 1.0)
+    scaled_shake_timer = 500 * scaling_factor
+    scaled_shake_timer *= uniform(0.8, 1.2)
     return round(scaled_shake_timer)
 
 
@@ -475,7 +592,7 @@ def reveal(tile):
     if tile.type != 0:
         if tile.type == -1:
             GameOver()
-        elif current_mines == 0 and check_all_revealed():
+        elif check_all_revealed():
             Win()
     else:
         currents = [tile]
@@ -491,7 +608,7 @@ def reveal(tile):
                 currents.remove(t)
         if revealed_tiles > 4:
             set_screen_shake(calculate_screen_shake_timer(revealed_tiles))
-        if current_mines == 0 and check_all_revealed():
+        if check_all_revealed():
             Win()
 
 
@@ -506,13 +623,31 @@ def flag(tile):
             flag_sound.play()
         else:
             unflag_sound.play()
-    if current_mines == 0 and check_all_revealed():
+    if check_all_revealed():
         Win()
 
 
+def chord(tile):
+    neighbours = tile.get_neighbours(Map, cols, rows)
+    flaged_neighbours = 0
+    for t in neighbours:
+        if t.flaged:
+            flaged_neighbours += 1
+    if flaged_neighbours == tile.type:
+        mines = False
+        for t in neighbours:
+            if t.type != -1:
+                if not t.revealed:
+                    reveal(t)
+            elif not t.flaged:
+                mines = True
+        if mines:
+            GameOver()
+
+
 def reset():
-    global Map, rows, cols, current_mines, first_click, game_over
-    Map, rows, cols, current_mines, first_click, game_over = set_level(dc.diff_nb[dc.current_diff])
+    global Map, rows, cols, current_mines, first_click, game_over, safe_tile
+    Map, rows, cols, current_mines, safe_tile, first_click, game_over = set_level(dc.diff_nb[dc.current_diff])
     if sound:
         refresh_sound.play()
 
@@ -521,6 +656,7 @@ def reset():
 
 try:
     particles = []
+    key_timer = 0
     sett = Settings()
     dc = DifficultyChooser()
     
@@ -530,6 +666,7 @@ try:
         keys = pygame.key.get_pressed()
         left_click = False
         right_click = False
+        middle_click = False
         scrolling = 0
         if keys[pygame.K_ESCAPE]:
             pygame.quit()
@@ -540,6 +677,8 @@ try:
                     left_click = True
                 elif e.button == 3:
                     right_click = True
+                elif e.button == 2:
+                    middle_click = True
             if e.type == pygame.MOUSEWHEEL:
                 if e.y < 0:
                     scrolling = -1
@@ -550,11 +689,15 @@ try:
                 exit()
         mouse_pos = pygame.mouse.get_pos()
         
-        if sound_switch_timer > 0:
-            sound_switch_timer -= dt
-        if (keys[pygame.K_m] or (sett.active and left_click and sett.sound_rect.collidepoint(mouse_pos))) and sound_switch_timer <= 0:
-            sound = not sound
-            sound_switch_timer = 300
+        if key_timer > 0:
+            key_timer -= dt
+        
+        if keys[pygame.K_m] and key_timer <= 0:
+            toggle_sound(True)
+        if keys[pygame.K_t] and key_timer <= 0:
+            show_starting_tile = not show_starting_tile
+            sett.safe_tile_button.toggle()
+            key_timer = 400
         
         if screen_shake:
             screen_shake_timer -= dt
@@ -569,31 +712,36 @@ try:
         pygame.draw.rect(win, 'black', (0, 0, WIN_SIZE[1], 35))
         
         ui_hovered = False
-        if menu_rect.collidepoint(mouse_pos):
+        if sett.active:
             ui_hovered = True
-        if dc.expanded and not ui_hovered:
+        elif menu_rect.collidepoint(mouse_pos):
+            ui_hovered = True
+        elif dc.expanded and not ui_hovered:
             if dc.is_hovered_exp():
                 ui_hovered = True
-        if sett.active and sett.rect.collidepoint(mouse_pos):
-            ui_hovered = True
         
         if (ui_hovered and left_click):
             if reload_rect.collidepoint(mouse_pos):
                 reset()
-        if keys[pygame.K_F5] or (keys[pygame.K_LCTRL] and keys[pygame.K_r]):
+        if key_timer <= 0 and (keys[pygame.K_F5] or (keys[pygame.K_LCTRL] and keys[pygame.K_r])):
+            key_timer = 500
             reset()
         
         for y, row in enumerate(Map):
             for x, tile in enumerate(row):
                 hovered = tile.is_hovered()
                 
-                if hovered and not ui_hovered and not game_over and not tile.revealed:
-                    if left_click and not tile.flaged:
-                        reveal(tile)
-                        if sound:
-                            click_sound.play()
-                    elif right_click:
-                        flag(tile)
+                if hovered and not ui_hovered and not game_over:
+                    if not tile.revealed:
+                        if left_click and not tile.flaged:
+                            reveal(tile)
+                            if sound:
+                                click_sound.play()
+                        elif right_click:
+                            flag(tile)
+                    elif (left_click and right_click) or middle_click:
+                        if tile.type != 0:
+                            chord(tile)
                 
                 if hovered and not ui_hovered and not (tile.revealed and (tile.type == 0 or tile.type == -1)):
                     pygame.draw.rect(win, tile.hovered_color, (x*TILE_SIZE + offset[0], y*TILE_SIZE + offset[1], TILE_SIZE, TILE_SIZE))
@@ -610,6 +758,10 @@ try:
                 elif tile.flaged:
                     img = flag_img if TILE_SIZE == 40 else pygame.transform.scale(flag_img, (TILE_SIZE, TILE_SIZE))
                     win.blit(img, (x*TILE_SIZE + offset[0], y*TILE_SIZE + offset[1]))
+        
+        if first_click and show_starting_tile:
+            pygame.draw.line(win, COLOR, (safe_tile.rect.left+3, safe_tile.rect.top+3), (safe_tile.rect.right-3, safe_tile.rect.bottom-3), 3)
+            pygame.draw.line(win, COLOR, (safe_tile.rect.right-3, safe_tile.rect.top+3), (safe_tile.rect.left+3, safe_tile.rect.bottom-3), 3)
         
         for p in particles:
             p.update(dt)
@@ -634,12 +786,17 @@ try:
         dc.update()
         dc.render()
         
-        if left_click and settings_rect.collidepoint(mouse_pos):
+        if (left_click and settings_rect.collidepoint(mouse_pos)) or (keys[pygame.K_s] and key_timer <= 0):
             sett.active = not sett.active
+            key_timer = 400
         
         win.blit(settings_icon, settings_rect)
         
         win.blit(reload_img, reload_rect)
+        
+        if keys[pygame.K_k] and key_timer <= 0:
+            sett.show_keys()
+            key_timer = 500
         
         if sett.active:
             sett.update()
