@@ -2,13 +2,20 @@
 from random import randint, uniform
 from time import time, ctime
 from math import cos, sin, radians
-from tkinter import messagebox
-from ctypes import windll
 from sys import exit
 import pygame
+from pygame._sdl2 import messagebox
+import os
 
 
-windll.shcore.SetProcessDpiAwareness(2) # avoid windows auto rescaling to make visible the entire window on low resolutions screens
+if os.name == 'nt':
+    from ctypes import windll
+    windll.shcore.SetProcessDpiAwareness(2) # avoid windows auto rescaling to make visible the entire window on low resolutions screens
+elif os.name == 'posix':
+    pass
+
+# Pygame setup ----------------------------------------------------------------
+
 pygame.init()
 
 WIN_SIZE = [600, 635]
@@ -16,7 +23,7 @@ WIN_SIZE = [600, 635]
 win = pygame.display.set_mode(WIN_SIZE)
 
 pygame.display.set_caption('Minesweeper')
-pygame.display.set_icon(pygame.image.load('asset\\logo2.png'))
+pygame.display.set_icon(pygame.image.load('asset' + os.sep + 'logo2.png'))
 
 clock = pygame.time.Clock()
 
@@ -79,18 +86,18 @@ themes = {
 
 def load_theme(theme):
     global flag_img, numbers
-    flag_img = pygame.image.load('asset\\'+themes[theme]['flag']).convert_alpha()
+    flag_img = pygame.image.load('asset' + os.sep + themes[theme]['flag']).convert_alpha()
     numbers = {}
     for tile_size in levels['tile'].values():
         numbers[tile_size] = {}
-        font = pygame.font.Font('asset\\JetBrainsMono-SemiBold.ttf', themes[theme]['size'][tile_size])
+        font = pygame.font.Font('asset' + os.sep + 'JetBrainsMono-SemiBold.ttf', themes[theme]['size'][tile_size])
         for nb in range(1, 9):
             numbers[tile_size][nb] = font.render(
                 str(nb) if not 'letters' in themes[theme] else themes[theme]['letters'][nb], True, themes[theme]['colors'][nb])
 
 
 def load_sound(name, volume=1):
-    s = pygame.mixer.Sound('asset\\'+name)
+    s = pygame.mixer.Sound('asset' + os.sep + name)
     s.set_volume(volume)
     return s
 
@@ -106,25 +113,25 @@ for theme in themes: # pre-load themes
         if not opt in themes[theme]:
             themes[theme][opt] = themes[0][opt]
 
-menu_font = pygame.font.Font('asset\\JetBrainsMono-SemiBold.ttf', 25)
+menu_font = pygame.font.Font('asset' + os.sep + 'JetBrainsMono-SemiBold.ttf', 25)
 menu_rect = pygame.Rect(0, 0, levels['win'][4], 35)
 
-mine_img = pygame.image.load('asset\\mine.png').convert_alpha()
+mine_img = pygame.image.load('asset' + os.sep + 'mine.png').convert_alpha()
 
-reload_img = pygame.transform.scale(pygame.image.load('asset\\reload_icon.png'), (25, 25)).convert_alpha()
+reload_img = pygame.transform.scale(pygame.image.load('asset' + os.sep + 'reload_icon.png'), (25, 25)).convert_alpha()
 reload_rect = reload_img.get_rect(center=(160, 17))
 
-settings_icon = pygame.transform.scale(pygame.image.load('asset\\settings_icon.png'), (22, 22)).convert_alpha()
+settings_icon = pygame.transform.scale(pygame.image.load('asset' + os.sep + 'settings_icon.png'), (22, 22)).convert_alpha()
 settings_rect = settings_icon.get_rect(center=(WIN_SIZE[0]-25, 17))
 
-flag_icon = pygame.image.load('asset\\flag_icon.png').convert_alpha()
-time_icon =  pygame.transform.scale(pygame.image.load('asset\\time_icon.png'), (20, 23)).convert_alpha()
+flag_icon = pygame.image.load('asset' + os.sep + 'flag_icon.png').convert_alpha()
+time_icon =  pygame.transform.scale(pygame.image.load('asset' + os.sep + 'time_icon.png'), (20, 23)).convert_alpha()
 
-sound_on_img = pygame.transform.scale(pygame.image.load('asset\\sound_on.png'), (25, 25)).convert_alpha()
-sound_off_img = pygame.transform.scale(pygame.image.load('asset\\sound_off.png'), (25, 25)).convert_alpha()
+sound_on_img = pygame.transform.scale(pygame.image.load('asset' + os.sep + 'sound_on.png'), (25, 25)).convert_alpha()
+sound_off_img = pygame.transform.scale(pygame.image.load('asset' + os.sep + 'sound_off.png'), (25, 25)).convert_alpha()
 
-themes_img = [pygame.image.load('asset\\theme'+str(i)+'.png').convert() for i in range(1, 6)]
-temp_font = pygame.font.Font('asset\\JetBrainsMono-SemiBold.ttf', 20)
+themes_img = [pygame.image.load('asset' + os.sep + 'theme'+str(i)+'.png').convert() for i in range(1, 6)]
+temp_font = pygame.font.Font('asset' + os.sep + 'JetBrainsMono-SemiBold.ttf', 20)
 themes_name_imgs = [
     temp_font.render('main theme', True, COLOR),
     temp_font.render('classic theme', True, COLOR),
@@ -331,11 +338,11 @@ class DifficultyChooser():
 
 class Settings():
     def __init__(self):
-        self.image = pygame.Surface((350, 350), pygame.SRCALPHA)
+        self.image = pygame.Surface((350, 350))#, pygame.SRCALPHA)
         self.rect = self.image.get_rect(center=(WIN_SIZE[0]/2, WIN_SIZE[1]/2))
         self.image.blit(menu_font.render('Themes :', True, COLOR), (20, 70))
         self.sound_rect = sound_on_img.get_rect(center=(self.rect.right - 28, self.rect.top+25))
-        self.controls_img = pygame.font.Font('asset\\JetBrainsMono-SemiBold.ttf', 20).render('Controls', True, COLOR)
+        self.controls_img = pygame.font.Font('asset' + os.sep + 'JetBrainsMono-SemiBold.ttf', 20).render('Controls', True, COLOR)
         self.controls_rect = self.controls_img.get_rect(topleft=(self.rect.left+20, self.rect.top+15))
         self.active = False
         self.image2 = pygame.Surface((350, 350), pygame.SRCALPHA)
@@ -347,7 +354,7 @@ class Settings():
         self.controls_rect.topleft = (self.rect.left+20, self.rect.top+15)
     
     def show_keys(self):
-        messagebox.showinfo('Controls','Press [ECHAP] to quit\n[m] to switch sound\nReveal a tile : left click\nFlag / unflag a tile : right click')
+        messagebox('Controls','Press [ECHAP] to quit\n[m] to switch sound\nReveal a tile : left click\nFlag / unflag a tile : right click')
     
     def update(self):
         if self.rect.collidepoint(mouse_pos):
