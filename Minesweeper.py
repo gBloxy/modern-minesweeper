@@ -2,7 +2,6 @@
 from random import randint, uniform, choice
 from time import time, ctime
 from math import cos, sin, radians
-from tkinter import messagebox
 from os.path import exists, join
 from os import name
 from sys import exit
@@ -71,29 +70,20 @@ themes = {
         'name': 'classic theme'
         },
     3: {
-        'colors': {1: 'blue4', 2: 'green4', 3: 'red3', 4: 'darkblue', 5: 'darkred', 6: 'purple3', 7: 'black', 8: 'darkgray'}
+        'flag': 'flag2.png',
+        'colors': {1: 'LightBlue', 2: 'DeepSkyBlue', 3: 'DodgerBlue', 4: 'SteelBlue', 5: 'MediumSlateBlue', 6: 'DarkSlateBlue', 7: 'MediumPurple', 8: 'DarkSlateGray'}
         },
     4: {
+        'colors': {1: 'blue4', 2: 'green4', 3: 'red3', 4: 'darkblue', 5: 'darkred', 6: 'purple3', 7: 'black', 8: 'darkgray'}
+        },
+    5: {
         'colors': {1: 'yellow', 2: 'orange', 3: 'orangered', 4: 'red3', 5: 'darkred', 6: 'lightgray', 7: 'darkgray', 8: 'black'},
         'flag': 'flag2.png'
         },
-    5: {
+    6: {
         'size': {40: 18, 30: 15, 20: 9},
         'flag': 'flag2.png',
         'letters': {1: 'I', 2: 'II', 3: 'III', 4: 'IV', 5:'V', 6:'VI', 7:'VII', 8: 'VI\nII'}
-        },
-    6: {
-        'flag': 'flag2.png',
-        'colors': {
-            1: 'LightBlue',
-            2: 'DeepSkyBlue',
-            3: 'DodgerBlue',
-            4: 'SteelBlue',
-            5: 'MediumSlateBlue',
-            6: 'DarkSlateBlue',
-            7: 'MediumPurple',
-            8: 'DarkSlateGray'
-        }
         }
     }
 
@@ -244,23 +234,25 @@ class Tile():
 # Particle class --------------------------------------------------------------
 
 class Particle():
-    __slots__ = ('rect', 'speed', 'angle', 'color', 'image', 'alive')
+    __slots__ = ('rect', 'speed', 'color', 'image', 'alive', 'cos', 'sin')
     def __init__(self, center, color):
         width = randint(4, 10)
         self.rect = pygame.Rect(*center, width, width)
         self.speed = randint(8, 12)
-        self.angle = randint(-180, 180)
         self.color = list(pygame.colordict.THECOLORS[color])
         self.image = pygame.Surface((width, width), pygame.SRCALPHA)
-        self.alive = True
+        angle = randint(-180, 180)
+        self.cos = cos(radians(angle))
+        self.sin = sin(radians(angle))
         
     def update(self, *args):
         self.color[3] -= 15
-        self.rect.x += cos(radians(self.angle)) * self.speed
-        self.rect.y += sin(radians(self.angle)) * self.speed
+        self.rect.x += self.cos * self.speed
+        self.rect.y += self.sin * self.speed
         self.speed -= 0.7
         if self.speed <= 0 or self.color[3] <= 0:
-            self.alive = False
+            return True
+        return False
         
     def render(self, surf):
         self.image.fill(self.color)
@@ -325,6 +317,7 @@ class DifficultyChooser():
                 self.expanded = not self.expanded
         else:
             self.hovered = False
+        
         if self.expanded:
             if left_click and not self.hovered:
                 self.expanded = False
@@ -337,15 +330,18 @@ class DifficultyChooser():
         self.image.fill((0, 0, 0, 0))
         if self.hovered:
             pygame.draw.rect(self.image, self.hovered_color, self.rect)
+        
         self.image.blit(self.images[self.current_diff], (self.rect.x + 5, self.rect.top - 3))
         pygame.draw.rect(self.image, COLOR, self.rect, 2)
         pygame.draw.polygon(self.image, COLOR, self.triangle_points)
+        
         if self.expanded:
             for opt in self.options.values():
                 if opt['rect'].collidepoint(mouse_pos):
                     pygame.draw.rect(self.image, self.hovered_color, opt['rect'])
                 self.image.blit(self.images[opt['name']], (self.rect.x + 5, self.rect.bottom + self.opt_size*opt['index'] - 2))
             pygame.draw.rect(self.image, COLOR, (self.rect.left, self.rect.bottom-2, self.rect.width, self.opt_size*3+4), 2)
+        
         win.blit(self.image, (0, 0))
 
 
@@ -420,46 +416,67 @@ class Settings():
         self.safe_tile_button.move((self.rect.left + 240, self.rect.top + 65))
     
     def show_keys(self):
+        from tkinter import messagebox
         messagebox.showinfo('Controls', controls_text)
+    
+    def toggle(self, state=None):
+        if state is not None:
+            self.active = state
+        else:
+            self.active = not self.active
+        if not self.active:
+            pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_ARROW)
     
     def update(self):
         global show_starting_tile
+        ui_hovered = False
         if self.rect.collidepoint(mouse_pos):
             pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_ARROW)
+            
             if scrolling != 0:
                 for rect in self.themes_rects:
                     rect.x += 30 * scrolling
+            
             if self.sound_button.update():
                 toggle_sound(switched=False)
             if self.safe_tile_button.update():
                 show_starting_tile = not show_starting_tile
+            
             if self.close_rect.collidepoint(mouse_pos):
-                pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_HAND)
+                ui_hovered = True
                 if left_click:
-                    pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_ARROW)
-                    self.active = False
+                    self.toggle(False)
+            
             if self.controls_rect.collidepoint(mouse_pos):
-                pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_HAND)
+                ui_hovered = True
                 if left_click:
                     self.show_keys()
+            
             for i in range(len(themes)-1):
                 if pygame.Rect(self.themes_rects[i].x + self.rect.left, self.themes_rects[i].y + self.rect.top, 120, 120).collidepoint(mouse_pos):
-                    pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_HAND)
+                    ui_hovered = True
                     if left_click:
                         load_theme(i+1)
+            
+            if ui_hovered:
+                pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_HAND)
     
     def render(self):
         win.blit(self.image, self.rect)
+        
         if self.controls_rect.collidepoint(mouse_pos):
             pygame.draw.rect(win, COLOR, (self.controls_rect.x, self.controls_rect.bottom - 2, self.controls_rect.width, 2))
+        
         self.image2.fill((0, 0, 0, 0))
         for i in range(1, len(themes)):
             self.image2.blit(themes[i]['img'], self.themes_rects[i-1])
             pygame.draw.rect(self.image2, COLOR, self.themes_rects[i-1], 2)
             blit_center(self.image2, themes[i]['name_rendered'], (self.themes_rects[i-1].centerx, self.themes_rects[i-1].top - 25))
         win.blit(self.image2, self.rect)
+        
         self.sound_button.render(win)
         self.safe_tile_button.render(win)
+        
         pygame.draw.rect(win, COLOR, self.rect, 3)
 
 
@@ -634,6 +651,8 @@ def chord(tile):
         if t.flaged:
             flaged_neighbours += 1
     if flaged_neighbours == tile.type:
+        if sound:
+            click_sound.play()
         mines = False
         for t in neighbours:
             if t.type != -1:
@@ -664,9 +683,7 @@ try:
         dt = clock.tick(30)
         events = pygame.event.get()
         keys = pygame.key.get_pressed()
-        left_click = False
-        right_click = False
-        middle_click = False
+        left_click = right_click = middle_click = False
         scrolling = 0
         if keys[pygame.K_ESCAPE]:
             pygame.quit()
@@ -679,7 +696,7 @@ try:
                     right_click = True
                 elif e.button == 2:
                     middle_click = True
-            if e.type == pygame.MOUSEWHEEL:
+            elif e.type == pygame.MOUSEWHEEL:
                 if e.y < 0:
                     scrolling = -1
                 elif e.y > 0:
@@ -707,23 +724,20 @@ try:
             offset = [randint(0, max(power, 1)) - power/2, 35 + randint(0, max(power, 1)) - power/2]
             win.fill('black')
         else:
-            offset = [0, 35]
+            offset = [0, 35] # to draw the board under the menu bar
         
         pygame.draw.rect(win, 'black', (0, 0, WIN_SIZE[1], 35))
         
         ui_hovered = False
-        if sett.active:
+        if sett.active or menu_rect.collidepoint(mouse_pos):
             ui_hovered = True
-        elif menu_rect.collidepoint(mouse_pos):
-            ui_hovered = True
-        elif dc.expanded and not ui_hovered:
+        elif dc.expanded:
             if dc.is_hovered_exp():
                 ui_hovered = True
         
-        if (ui_hovered and left_click):
-            if reload_rect.collidepoint(mouse_pos):
-                reset()
-        if key_timer <= 0 and (keys[pygame.K_F5] or (keys[pygame.K_LCTRL] and keys[pygame.K_r])):
+        if ui_hovered and left_click and reload_rect.collidepoint(mouse_pos):
+            reset()
+        elif key_timer <= 0 and (keys[pygame.K_F5] or (keys[pygame.K_LCTRL] and keys[pygame.K_r])):
             key_timer = 500
             reset()
         
@@ -731,19 +745,23 @@ try:
             for x, tile in enumerate(row):
                 hovered = tile.is_hovered()
                 
-                if hovered and not ui_hovered and not game_over:
+                if not ui_hovered and hovered and not game_over:
                     if not tile.revealed:
-                        if left_click and not tile.flaged:
+                        
+                        if not tile.flaged and (left_click or keys[pygame.K_RETURN]):
                             reveal(tile)
                             if sound:
                                 click_sound.play()
-                        elif right_click:
+                        
+                        elif right_click or (key_timer <= 0 and keys[pygame.K_f]):
+                            key_timer = 300
                             flag(tile)
-                    elif (left_click and right_click) or middle_click:
-                        if tile.type != 0:
+                    
+                    elif tile.type != 0 and ((left_click and right_click) or middle_click or keys[pygame.K_SPACE]):
+                        if not all([(t.revealed or t.flaged) for t in tile.get_neighbours(Map, cols, rows)]):
                             chord(tile)
                 
-                if hovered and not ui_hovered and not (tile.revealed and (tile.type == 0 or tile.type == -1)):
+                if not ui_hovered and hovered and not (tile.revealed and (tile.type == 0 or tile.type == -1)):
                     pygame.draw.rect(win, tile.hovered_color, (x*TILE_SIZE + offset[0], y*TILE_SIZE + offset[1], TILE_SIZE, TILE_SIZE))
                 else:
                     pygame.draw.rect(win, tile.color, (x*TILE_SIZE + offset[0], y*TILE_SIZE + offset[1], TILE_SIZE, TILE_SIZE))
@@ -764,8 +782,7 @@ try:
             pygame.draw.line(win, COLOR, (safe_tile.rect.right-3, safe_tile.rect.top+3), (safe_tile.rect.left+3, safe_tile.rect.bottom-3), 3)
         
         for p in particles:
-            p.update(dt)
-            if not p.alive:
+            if p.update(dt):
                 particles.remove(p)
             else:
                 p.render(win)
@@ -787,7 +804,7 @@ try:
         dc.render()
         
         if (left_click and settings_rect.collidepoint(mouse_pos)) or (keys[pygame.K_s] and key_timer <= 0):
-            sett.active = not sett.active
+            sett.toggle()
             key_timer = 400
         
         win.blit(settings_icon, settings_rect)
