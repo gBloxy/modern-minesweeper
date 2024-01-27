@@ -2,7 +2,7 @@
 from random import randint, uniform, choice
 from time import time, ctime
 from math import cos, sin, radians
-from os.path import exists, join
+from os.path import join
 from os import name
 from sys import exit
 import pygame
@@ -92,16 +92,8 @@ themes = {
 
 # Utils functions -------------------------------------------------------------
 
-def load_theme(theme):
-    global flag_img, numbers
-    flag_img = pygame.image.load(join('asset', 'images', themes[theme]['flag'])).convert_alpha()
-    numbers = {}
-    for tile_size in levels['tile'].values():
-        numbers[tile_size] = {}
-        font = pygame.font.Font(join('asset', 'font', themes[theme]['font']), themes[theme]['size'][tile_size])
-        for nb in range(1, 9):
-            numbers[tile_size][nb] = font.render(
-                str(nb) if not 'letters' in themes[theme] else themes[theme]['letters'][nb], True, themes[theme]['colors'][nb])
+def blit_center(dst, src, center, *args, **kwargs):
+    dst.blit(src, (center[0] - src.get_width()/2, center[1] - src.get_height()/2), *args, **kwargs)
 
 
 def load_sound(name, volume=1):
@@ -110,8 +102,44 @@ def load_sound(name, volume=1):
     return s
 
 
-def blit_center(surface, surf, center, *args, **kwargs):
-    surface.blit(surf, (center[0] - surf.get_width()/2, center[1] - surf.get_height()/2), *args, **kwargs)
+def get_color(x, y, color1, color2):
+    if x % 2 == 0:
+        if y % 2 == 0:
+            return color1
+        else:
+            return color2
+    else:
+        if y % 2 == 0:
+            return color2
+        else:
+            return color1
+
+
+def create_numbers(theme):
+    numbers = {}
+    for tile_size in levels['tile'].values():
+        numbers[tile_size] = {}
+        font = pygame.font.Font(join('asset', 'font', theme['font']), theme['size'][tile_size])
+        for nb in range(1, 9):
+            numbers[tile_size][nb] = font.render(str(nb) if not 'letters' in theme else theme['letters'][nb], True, theme['colors'][nb])
+    return numbers
+
+
+def load_theme(theme):
+    global flag_img, numbers
+    flag_img = themes[theme]['flag_img']
+    numbers = themes[theme]['numerals']
+
+
+def create_theme_preview(theme):
+    surface = pygame.Surface((120, 120))
+    surface.blit(r.theme_preview_bkg, (0, 0))
+    blit_center(surface, theme['numerals'][40][1], (20, 20))
+    blit_center(surface, theme['numerals'][40][2], (60, 20))
+    blit_center(surface, theme['numerals'][40][3], (60, 60))
+    blit_center(surface, theme['flag_img'],       (100, 60))
+    blit_center(surface, r.mine_img,             (100, 100))
+    return surface
 
 
 # load ressources -------------------------------------------------------------
@@ -128,6 +156,8 @@ class RessourceManager():
         self.flag_icon = pygame.image.load(join('asset', 'icons', 'flag_icon.png')).convert_alpha()
         self.time_icon =  pygame.transform.scale(pygame.image.load(join('asset', 'icons', 'time_icon.png')), (20, 23)).convert_alpha()
         
+        self.theme_preview_bkg = pygame.image.load(join('asset', 'logos', 'theme_preview_bkg.png')).convert()
+        
         self.refresh_sound = load_sound('refresh.mp3', 0.2)
         self.click_sound = load_sound('click_sound.wav', 0.6)
         self.exp_sound = load_sound('explosion_sound.wav')
@@ -142,24 +172,17 @@ reload_rect = r.reload_img.get_rect(center=(160, 17))
 settings_rect = r.settings_icon.get_rect(center=(WIN_SIZE[0]-25, 17))
 
 for theme in themes:
-    for opt in themes[0]:
-        if not opt in themes[theme]:
-            themes[theme][opt] = themes[0][opt]
     if theme != 0:
+        for opt in themes[0]:
+            if not opt in themes[theme]:
+                themes[theme][opt] = themes[0][opt]
         name = 'theme '+str(theme) if themes[theme]['name'] == 'theme' else themes[theme]['name']
         themes[theme]['name_rendered'] = r.font_small.render(name, True, COLOR)
-        img_name = join('asset', 'themes', 'theme'+str(theme)+'.png')
-        if exists(img_name):
-            themes[theme]['img'] = pygame.image.load(img_name).convert()
-        else:
-            themes[theme]['img'] = pygame.Surface((120, 120))
+        themes[theme]['numerals'] = create_numbers(themes[theme])
+        themes[theme]['flag_img'] = pygame.image.load(join('asset', 'images', themes[theme]['flag'])).convert_alpha()
+        themes[theme]['img'] = create_theme_preview(themes[theme])
 
 load_theme(1)
-
-screen_shake = False
-screen_shake_timer = 0
-show_starting_tile = True
-sound = True
 
 
 # Tile class ------------------------------------------------------------------
@@ -173,7 +196,7 @@ class Tile():
         self.type = None
         self.revealed = False
         self._flaged = False
-        self.get_color()
+        self.color = get_color(x, y, BKG1, BKG2)
     
     @property
     def flaged(self):
@@ -195,21 +218,9 @@ class Tile():
         self.revealed = True
         if self.flaged:
             self.flaged = False
-        self.get_color()
+        self.color = get_color(self.x, self.y, BKGR1, BKGR2)
         for i in range(self.get_particles_nb(dc.diff_nb[dc.current_diff])):
             particles.append(Particle(self.rect.center, 'red' if self.type == -1 else 'purple'))
-    
-    def get_color(self):
-        if self.x % 2 == 0:
-            if self.y % 2 == 0:
-                self.color = BKG1 if not self.revealed else BKGR1
-            else:
-                self.color = BKG2 if not self.revealed else BKGR2
-        else:
-            if self.y % 2 == 0:
-                self.color = BKG2 if not self.revealed else BKGR2
-            else:
-                self.color = BKG1 if not self.revealed else BKGR1
     
     def get_particles_nb(self, diff):
         if self.type != -1:
@@ -307,7 +318,7 @@ class DifficultyChooser():
                     'index': index
                     }
                 index += 1
-        Map, rows, cols, current_mines, safe_tile, first_click, game_over = set_level(self.diff_nb[diff])
+        Map, rows, cols, current_mines, safe_tile = set_level(self.diff_nb[diff])
     
     def is_hovered_exp(self):
         hovered = self.hovered
@@ -384,15 +395,16 @@ class SwitchButton():
         pygame.draw.rect(surf, COLOR, self.rect, 2, border_radius=75)
 
 
-controls_text = """Reveal a tile : left click or [RETURN]
-Flag / unflag a tile : right click or [f]
-Chord : middle click or both left and right click or [SPACE]
-Reset the level : Ctrl+r or F5
-Switch sound : [m]
-Show the suggested safe starting tile : [t]
-Open / close the settings menu : [s]
-Show this message again : [k]
-Quit the game : [ECHAP]"""
+controls_text = """- Reveal a tile : left click or [RETURN]
+- Flag / unflag a tile : right click or [f]
+- Chord : middle click or both left and right click or [SPACE]
+- Reset the level : Ctrl+r or F5
+- Switch sound : [m]
+- Show the suggested safe starting tile : [t]
+- Navigate between themes : scoll up/down or arrows [UP]/[DOWN]
+- Open / close the settings menu : [s]
+- Show this message again : [k]
+- Quit the game : [ECHAP]"""
 
 
 class Settings():
@@ -400,7 +412,7 @@ class Settings():
         self.image = pygame.Surface((350, 350), pygame.SRCALPHA)
         self.rect = self.image.get_rect(center=(WIN_SIZE[0]/2, WIN_SIZE[1]/2))
         self.setup_ui()
-        self.themes_rects = tuple([pygame.Rect(i*160 + 35, 172, 120, 120) for i in range(len(themes)-1)])
+        self.themes_rects = tuple([pygame.Rect(i*160 + 35, 172, 122, 122) for i in range(len(themes)-1)])
         self.sound_button = SwitchButton('sound', (self.rect.left + 240, self.rect.top + 30))
         self.safe_tile_button = SwitchButton('safe starting tile', (self.rect.left + 240, self.rect.top + 65))
         self.active = False
@@ -436,6 +448,10 @@ class Settings():
         if not self.active:
             pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_ARROW)
     
+    def scroll_themes(self, scroll):
+        for rect in self.themes_rects:
+            rect.x += 30 * scroll
+    
     def update(self):
         global show_starting_tile
         ui_hovered = False
@@ -443,8 +459,11 @@ class Settings():
             pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_ARROW)
             
             if scrolling != 0:
-                for rect in self.themes_rects:
-                    rect.x += 30 * scrolling
+                self.scroll_themes(scrolling)
+            elif keys[pygame.K_UP]:
+                self.scroll_themes(-0.5)
+            elif keys[pygame.K_DOWN]:
+                self.scroll_themes(0.5)
             
             if self.sound_button.update():
                 toggle_sound(switched=False)
@@ -455,6 +474,7 @@ class Settings():
                 ui_hovered = True
                 if left_click:
                     self.toggle(False)
+                    return
             
             if self.controls_rect.collidepoint(mouse_pos):
                 ui_hovered = True
@@ -492,7 +512,7 @@ class Settings():
 # Load level function ---------------------------------------------------------
 
 def set_level(difficulty):
-    global WIN_SIZE, TILE_SIZE, win, settings_rect
+    global WIN_SIZE, TILE_SIZE, win, settings_rect, first_click, game_over, zoom
      # load variables
     rows = cols = levels['map'][difficulty]
     WIN_SIZE = [levels['win'][difficulty], levels['win'][difficulty] + 35]
@@ -500,6 +520,9 @@ def set_level(difficulty):
     TILE_SIZE = levels['tile'][difficulty]
     sett.win_adapt()
     settings_rect = r.settings_icon.get_rect(center=(WIN_SIZE[0]-25, 18))
+    first_click = True
+    game_over = False
+    zoom = 1
     
     # create raw map
     Map = [[Tile(x, y) for x in range(cols)] for y in range(rows)]
@@ -539,7 +562,7 @@ def set_level(difficulty):
                 if opening[1] > max_opening[1]:
                     max_opening = opening
     safe_tile = choice(max_opening[0])
-    return Map, rows, cols, mines, safe_tile, True, False
+    return Map, rows, cols, mines, safe_tile
 
 
 def explore_opening(tile, visited, Map, cols, rows):
@@ -675,16 +698,23 @@ def chord(tile):
 
 def reset():
     global Map, rows, cols, current_mines, first_click, game_over, safe_tile
-    Map, rows, cols, current_mines, safe_tile, first_click, game_over = set_level(dc.diff_nb[dc.current_diff])
+    Map, rows, cols, current_mines, safe_tile = set_level(dc.diff_nb[dc.current_diff])
     if sound:
         r.refresh_sound.play()
 
 
 # Game Loop -------------------------------------------------------------------
 
+screen_shake = False
+screen_shake_timer = 0
+show_starting_tile = True
+sound = True
+particles = []
+key_timer = 0
+zoom = 1
+zoom_offset = [0, 0]
+
 try:
-    particles = []
-    key_timer = 0
     sett = Settings()
     dc = DifficultyChooser()
     
@@ -712,7 +742,8 @@ try:
             elif e.type == pygame.QUIT:
                 pygame.quit()
                 exit()
-        mouse_pos = pygame.mouse.get_pos()
+        mouse_pos = tuple(coo * zoom for coo in pygame.mouse.get_pos())
+
         
         if key_timer > 0:
             key_timer -= dt
@@ -734,6 +765,14 @@ try:
             win.fill('black')
         else:
             offset = (0, 35) # to draw the board under the menu bar
+        
+        if not sett.active and key_timer <= 0 and dc.diff_nb[dc.current_diff] > 2:
+            if (keys[pygame.K_UP] or scrolling == 1) and zoom < 2:
+                zoom += 0.5
+                key_timer = 200
+            elif (keys[pygame.K_DOWN] or scrolling == -1) and zoom > 1:
+                zoom -= 0.5
+                key_timer = 200
         
         pygame.draw.rect(win, 'black', (0, 0, WIN_SIZE[1], 35))
         
