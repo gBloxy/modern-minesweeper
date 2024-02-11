@@ -432,7 +432,7 @@ class SwitchButton():
 
 class Settings():
     def __init__(self):
-        self.image = pygame.Surface((350, 350), pygame.SRCALPHA)
+        self.image = pygame.Surface((350, 350))#, pygame.SRCALPHA)
         self.rect = self.image.get_rect(center=(WIN_SIZE[0]/2, WIN_SIZE[1]/2))
         self.setup_ui()
         self.themes_rects = tuple([pygame.Rect(i*160 + 35, 172, 122, 122) for i in range(len(themes)-1)])
