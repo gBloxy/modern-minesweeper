@@ -6,9 +6,10 @@ Link to the itch.io game page : [minesweeper](https://g-bloxy.itch.io/minesweepe
 
 ## Screenshots
 
-![cover_img](https://github.com/gBloxy/modern-minesweeper/assets/121670440/bc6760cc-8371-4f86-b0e9-ff6ff6324daa)  
-![theme screen](https://github.com/gBloxy/modern-minesweeper/assets/121670440/6aa2d45f-eea0-4670-9f9d-84b21c0b7e45)
-![extreme-classic](https://github.com/gBloxy/modern-minesweeper/assets/121670440/d124defd-6440-4574-a0cb-d2c1c7182cdd)
+![social preview](https://github.com/gBloxy/modern-minesweeper/assets/121670440/53370a04-86a3-409e-bf6e-3cd39001fabd)  
+![theme page](https://github.com/gBloxy/modern-minesweeper/assets/121670440/75ce9e03-aad0-42db-ae7d-70df7e42b9a9)
+![extreme classic](https://github.com/gBloxy/modern-minesweeper/assets/121670440/2be64c9a-8984-4ccf-bb65-cd4d5c231205)
+
 
 ## Gameplay
 
