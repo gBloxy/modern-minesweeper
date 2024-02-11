@@ -1,7 +1,7 @@
 # g_Bloxy's Minesweeper
 
 This is a classic minesweeper game with a modern look made in [python](https://www.python.org) with pygame.  
-The game features four levels of difficulty from easy to extreme with five differents themes and a cool particles effect.  
+The game features four levels of difficulty from easy to extreme with six differents themes and a cool particles effect.  
 Link to the itch.io game page : [minesweeper](https://g-bloxy.itch.io/minesweeper).
 
 ## Screenshots
@@ -16,11 +16,12 @@ Minesweeper is a classic game where you navigate through a grid of squares. The 
 
 ## Controls
 
-+ reveal a tile : left click
-+ flag  / unflag a tile : right click
++ reveal a tile : left click or RETURN
++ flag  / unflag a tile : right click or f
++ chord : middle click or both left and right click or SPACE
 + restart current level : Ctrl+r or F5
-+ switch sound : m
 + quit : ESCAPE
++ and more explained in the game menu
 
 ## Play the game
 
